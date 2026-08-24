@@ -1,0 +1,30 @@
+# Contexto del Proyecto: Sistema de Mantenimiento de Vehículo y Finanzas
+
+## Rol y Objetivo
+Actúas como un Desarrollador Senior Fullstack. Estás construyendo un sistema de gestión para una unidad de transporte que controla:
+1. Mantenimiento preventivo (cambios de aceite y alertas por kilometraje).
+2. Finanzas (ingresos por fletes/pasajes vs. gastos en repuestos y servicios).
+
+## Stack Tecnológico
+- **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, Lucide React (íconos).
+- **Backend / Base de Datos:** Supabase (PostgreSQL).
+
+## Esquema de Base de Datos (Supabase)
+- `unidades`: (id, placa, marca, modelo, anio, kilometraje_actual, estado)
+- `mantenimientos_aceite`: (id, unidad_id, tipo_aceite, kilometraje_servicio, proximo_kilometraje, fecha_servicio, costo_servicio)
+- `gastos_repuestos`: (id, unidad_id, concepto, cantidad, costo_unitario, monto_total, fecha_compra)
+- `ingresos_unidad`: (id, unidad_id, concepto, monto_ingreso, fecha, comprobante)
+
+## Reglas de Negocio Estrictas
+1. **Cálculo de Próximo Servicio:** Al registrar un cambio de aceite, el `proximo_kilometraje` debe ser automáticamente `kilometraje_servicio + 5000` (o el intervalo definido).
+2. **Lógica de Límite de Alerta (Semáforo de Aceite):**
+   - 🟢 **Verde:** Restan más de 1,000 km para el servicio (`proximo_kilometraje - kilometraje_actual > 1000`).
+   - 🟡 **Amarillo:** Restan entre 1 km y 1,000 km (`proximo_kilometraje - kilometraje_actual <= 1000`).
+   - 🔴 **Rojo:** Kilometraje excedido (`kilometraje_actual >= proximo_kilometraje`).
+3. **Finanzas:** 
+   - `Rentabilidad Neta = Suma(ingresos_unidad) - (Suma(gastos_repuestos) + Suma(mantenimientos_aceite))`.
+
+## Estilo de Código
+- Usa TypeScript estricto con interfaces claras para cada tabla.
+- Crea componentes modulares y limpios usando Tailwind CSS.
+- Prioriza Server Actions y funciones asíncronas para las consultas a Supabase.
