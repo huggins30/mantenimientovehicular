@@ -83,14 +83,14 @@ export function LoginForm() {
           </button>
         </div>
 
-        {/* Mensaje de verificación de email */}
+        {/* Mensaje de registro exitoso */}
         {mode === "register" && registerState.success && (
           <div className="mb-4 flex items-start gap-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-4">
             <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-emerald-300">¡Registro exitoso!</p>
               <p className="text-xs text-emerald-400/80 mt-0.5">
-                Revisa tu bandeja de entrada para confirmar tu email.
+                Tu cuenta está pendiente de aprobación por el administrador.
               </p>
             </div>
           </div>

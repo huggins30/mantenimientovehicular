@@ -6,7 +6,7 @@
 // ============================================================
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase";
 import type { ActionResult, MantenimientoAceite, NuevoMantenimientoAceite, Unidad } from "@/lib/types";
 
 /** Intervalo estándar de cambio de aceite en kilómetros */
@@ -34,6 +34,27 @@ export async function crearUnidadAction(
   
   if (userError || !user) {
     return { success: false, error: "No estás autenticado." };
+  }
+
+  // Verificar límite de unidades del perfil
+  const { data: perfil } = await supabaseAdmin
+    .from("perfiles")
+    .select("max_unidades")
+    .eq("id", user.id)
+    .single();
+
+  if (perfil) {
+    const { count: totalUnidades } = await supabaseAdmin
+      .from("unidades")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (totalUnidades !== null && totalUnidades >= perfil.max_unidades) {
+      return {
+        success: false,
+        error: `Has alcanzado el límite de ${perfil.max_unidades} unidad(es) permitida(s). Contacta al administrador para ampliar tu cuota.`,
+      };
+    }
   }
 
   const { data, error } = await supabase

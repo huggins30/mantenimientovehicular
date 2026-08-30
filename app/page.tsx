@@ -12,15 +12,22 @@ import {
   LogOut,
   User,
   Package,
+  Shield,
+  Hammer,
 } from "lucide-react";
-import { getDashboardData, getUnidadesUsuario } from "@/app/actions/dashboard";
+import { getDashboardData, getGlobalDashboardData, getUnidadesUsuario } from "@/app/actions/dashboard";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { signOutAction } from "@/app/actions/auth";
+import { getPerfilUsuario } from "@/app/actions/admin";
 import { FinancialSummaryCard } from "@/components/dashboard/FinancialSummaryCard";
+import { UpdateMileageCard } from "@/components/dashboard/UpdateMileageCard";
 import { OilChangeWidget } from "@/components/dashboard/OilChangeWidget";
 import { OilChangeForm } from "@/components/forms/OilChangeForm";
 import { SparePartsForm } from "@/components/forms/SparePartsForm";
 import { SparePartsTable } from "@/components/dashboard/SparePartsTable";
+import { ManoObraForm } from "@/components/forms/ManoObraForm";
+import { ManoObraTable } from "@/components/dashboard/ManoObraTable";
+import { GlobalUnitSummaryTable } from "@/components/dashboard/GlobalUnitSummaryTable";
 import { IncomeForm } from "@/components/forms/IncomeForm";
 import { IncomeTable } from "@/components/dashboard/IncomeTable";
 import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
@@ -48,10 +55,16 @@ export default async function DashboardPage({
   const userEmail = user?.email ?? "";
   const userInitial = userEmail.charAt(0).toUpperCase();
 
+  // Perfil del usuario (para verificar si es admin y limite)
+  const perfil = await getPerfilUsuario();
+  const isAdmin = perfil?.rol === "admin";
+  const maxUnidades = perfil?.max_unidades ?? 1;
+
   // 2. Unidades y Params
   const unidades = await getUnidadesUsuario();
   const params = await searchParams;
   const activeTab = params.tab || "resumen";
+  const canAddUnit = unidades.length < maxUnidades;
 
   // HEADER ESTÁNDAR para estado vacío o error
   const ErrorHeader = (
@@ -63,14 +76,26 @@ export default async function DashboardPage({
               Gestión Vehicular
             </h1>
           </div>
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-red-400"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </form>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <a
+                href="/admin"
+                className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-300 hover:bg-violet-500/20 hover:border-violet-500/40 transition-all duration-200"
+              >
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:block">Panel de Admin</span>
+              </a>
+            )}
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                title="Cerrar sesión"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-all duration-200"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </header>
@@ -98,15 +123,20 @@ export default async function DashboardPage({
   }
 
   // 5. Cargar datos del dashboard
-  let dashboardData;
+  let dashboardData: any;
+  let globalData: any;
   let error: string | null = null;
   try {
-    dashboardData = await getDashboardData(activeUnidadId);
+    if (activeTab === "general") {
+      globalData = await getGlobalDashboardData();
+    } else if (activeTab !== "nueva-unidad") {
+      dashboardData = await getDashboardData(activeUnidadId);
+    }
   } catch (err) {
     error = err instanceof Error ? err.message : "Error al cargar datos.";
   }
 
-  if (error || !dashboardData) {
+  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad")) {
     return (
       <main className="min-h-screen bg-background text-white">
         {ErrorHeader}
@@ -119,13 +149,20 @@ export default async function DashboardPage({
     );
   }
 
-  const { unidad, financialSummary, oilChangeStatus, ultimosGastos, ultimosIngresos } = dashboardData;
+  const { 
+    unidad, 
+    financialSummary, 
+    oilChangeStatus, 
+    ultimosGastos, 
+    ultimosGastosManoObra,
+    ultimosIngresos 
+  } = dashboardData || {};
 
   // Render principal con Layout (Sidebar + Main)
   return (
     <div className="flex min-h-screen bg-background text-white">
       {/* ===== SIDEBAR (Izquierda) ===== */}
-      <Sidebar activeUnidadId={activeUnidadId} />
+      <Sidebar activeUnidadId={activeUnidadId} isAdmin={isAdmin} />
 
       {/* ===== CONTENIDO PRINCIPAL (Derecha) ===== */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -138,29 +175,19 @@ export default async function DashboardPage({
               <span className="font-bold text-lg tracking-tight">Gestión Vehicular</span>
             </div>
             
-            {/* Selector de Unidades */}
-            <div className="hidden md:flex flex-1 items-center justify-start">
-              {unidades.length > 1 ? (
-                <UnitSwitcher unidades={unidades} activeUnidadId={activeUnidadId} />
-              ) : (
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-sm font-medium text-slate-300">
-                    {unidad.placa} — {unidad.marca} {unidad.modelo}
-                  </span>
-                </div>
-              )}
-            </div>
+            {/* Selector de Unidades (Movido a la sección principal) */}
 
             {/* Derecha: KM + usuario + logout */}
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               {/* KM actual */}
-              <div className="hidden sm:flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2">
-                <CalendarDays className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
-                <span className="text-sm font-bold text-violet-300">
-                  {new Intl.NumberFormat("es-PE").format(unidad.kilometraje_actual)} km
-                </span>
-              </div>
+              {activeTab !== "general" && unidad && (
+                <div className="hidden sm:flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2">
+                  <CalendarDays className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
+                  <span className="text-sm font-bold text-violet-300">
+                    {new Intl.NumberFormat("es-PE").format(unidad.kilometraje_actual)} km
+                  </span>
+                </div>
+              )}
 
               {/* Avatar de usuario */}
               <div
@@ -198,18 +225,130 @@ export default async function DashboardPage({
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="mx-auto max-w-5xl space-y-10 pb-20 md:pb-0">
             
+            {/* Selector de Unidades (Nueva ubicación: debajo del header, full width) */}
+            <div className="flex w-full items-center mb-2">
+              <UnitSwitcher unidades={unidades} activeUnidadId={activeUnidadId} canAddUnit={canAddUnit} />
+            </div>
+
             {/* Título condicional según la pestaña */}
             <div>
               <h2 className="text-2xl font-bold text-white">
-                {activeTab === "resumen" && `Resumen de la Unidad: ${unidad.placa}`}
-                {activeTab === "aceite" && `Control de Aceite: ${unidad.placa}`}
-                {activeTab === "ingresos" && `Ingresos Diarios: ${unidad.placa}`}
-                {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad.placa}`}
+                {activeTab === "general" && "Resumen Global de Flota"}
+                {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
+                {activeTab === "resumen" && `Resumen de la Unidad: ${unidad?.placa}`}
+                {activeTab === "aceite" && `Control de Aceite: ${unidad?.placa}`}
+                {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.placa}`}
+                {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.placa}`}
+                {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.placa}`}
               </h2>
               <p className="mt-1 text-slate-400 text-sm">
-                Vehículo {unidad.marca} {unidad.modelo} ({unidad.anio})
+                {activeTab === "general" 
+                  ? `Análisis global de ${globalData?.unidadesCount} vehículos asignados.`
+                  : activeTab === "nueva-unidad"
+                  ? "Agrega los datos de la nueva unidad asignada."
+                  : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio})`
+                }
               </p>
             </div>
+
+            {/* TAB: NUEVA UNIDAD */}
+            {activeTab === "nueva-unidad" && (
+              <section className="py-6">
+                <CreateUnitForm />
+              </section>
+            )}
+
+            {/* TAB: RESUMEN GENERAL (Todas las unidades) */}
+            {activeTab === "general" && globalData && (
+              <>
+                <section>
+                  <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Métricas Globales (Toda la Flota)
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                    <FinancialSummaryCard
+                      title="Total Ingresos"
+                      amount={globalData.financialSummary.totalIngresos}
+                      icon={TrendingUp}
+                      variant="income"
+                      subtitle="Ingresos de todos los vehículos"
+                    />
+                    <FinancialSummaryCard
+                      title="Gastos en Repuestos"
+                      amount={globalData.financialSummary.totalGastosRepuestos}
+                      icon={ShoppingCart}
+                      variant="expense"
+                      subtitle="Compras acumuladas"
+                    />
+                    <FinancialSummaryCard
+                      title="Mantenimiento Aceite"
+                      amount={globalData.financialSummary.totalMantenimientoAceite}
+                      icon={Wrench}
+                      variant="maintenance"
+                      subtitle="Servicios de todas las unidades"
+                    />
+                    <FinancialSummaryCard
+                      title="Mano de Obra"
+                      amount={globalData.financialSummary.totalManoObra}
+                      icon={Hammer}
+                      variant="labor"
+                      subtitle="Servicios mecánicos acumulados"
+                    />
+                    <FinancialSummaryCard
+                      title="Rentabilidad Global"
+                      amount={globalData.financialSummary.rentabilidadNeta}
+                      icon={BarChart3}
+                      variant="profit"
+                      subtitle="Ingresos − Gastos Totales"
+                    />
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
+                    Desglose del Cálculo Global de Rentabilidad
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-emerald-300 font-mono font-semibold">
+                      {formatCurrency(globalData.financialSummary.totalIngresos)}
+                    </div>
+                    <span className="text-slate-500 font-bold">−</span>
+                    <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                      <span className="text-slate-400 font-mono">(</span>
+                      <span className="text-red-300 font-mono font-semibold" title="Repuestos">
+                        {formatCurrency(globalData.financialSummary.totalGastosRepuestos)}
+                      </span>
+                      <span className="text-slate-400 font-mono">+</span>
+                      <span className="text-amber-300 font-mono font-semibold" title="Aceite">
+                        {formatCurrency(globalData.financialSummary.totalMantenimientoAceite)}
+                      </span>
+                      <span className="text-slate-400 font-mono">+</span>
+                      <span className="text-orange-300 font-mono font-semibold" title="Mano de Obra">
+                        {formatCurrency(globalData.financialSummary.totalManoObra)}
+                      </span>
+                      <span className="text-slate-400 font-mono">)</span>
+                    </div>
+                    <span className="text-slate-500 font-bold">=</span>
+                    <div
+                      className={`rounded-xl px-4 py-2 font-mono font-bold text-lg ${
+                        globalData.financialSummary.rentabilidadNeta >= 0
+                          ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/20"
+                          : "bg-red-500/15 border border-red-500/30 text-red-300"
+                      }`}
+                    >
+                      {formatCurrency(globalData.financialSummary.rentabilidadNeta)}
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Resumen Financiero por Unidad
+                  </h3>
+                  <GlobalUnitSummaryTable resumen={globalData.resumenPorUnidad} />
+                </section>
+              </>
+            )}
 
             {/* TAB: RESUMEN FINANCIERO */}
             {activeTab === "resumen" && (
@@ -218,7 +357,7 @@ export default async function DashboardPage({
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Métricas Globales
                   </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <FinancialSummaryCard
                       title="Total Ingresos"
                       amount={financialSummary.totalIngresos}
@@ -241,6 +380,13 @@ export default async function DashboardPage({
                       subtitle="Cambios realizados"
                     />
                     <FinancialSummaryCard
+                      title="Mano de Obra"
+                      amount={financialSummary.totalManoObra}
+                      icon={Hammer}
+                      variant="labor"
+                      subtitle="Servicios mecánicos"
+                    />
+                    <FinancialSummaryCard
                       title="Rentabilidad Neta"
                       amount={financialSummary.rentabilidadNeta}
                       icon={BarChart3}
@@ -250,38 +396,49 @@ export default async function DashboardPage({
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
-                    Desglose del Cálculo de Rentabilidad
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-emerald-300 font-mono font-semibold">
-                      {formatCurrency(financialSummary.totalIngresos)}
+                <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+                  <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
+                      Desglose del Cálculo de Rentabilidad
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                      <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-emerald-300 font-mono font-semibold">
+                        {formatCurrency(financialSummary.totalIngresos)}
+                      </div>
+                      <span className="text-slate-500 font-bold">−</span>
+                      <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                        <span className="text-slate-400 font-mono">(</span>
+                        <span className="text-red-300 font-mono font-semibold" title="Repuestos">
+                          {formatCurrency(financialSummary.totalGastosRepuestos)}
+                        </span>
+                        <span className="text-slate-400 font-mono">+</span>
+                        <span className="text-amber-300 font-mono font-semibold" title="Aceite">
+                          {formatCurrency(financialSummary.totalMantenimientoAceite)}
+                        </span>
+                        <span className="text-slate-400 font-mono">+</span>
+                        <span className="text-orange-300 font-mono font-semibold" title="Mano de Obra">
+                          {formatCurrency(financialSummary.totalManoObra)}
+                        </span>
+                        <span className="text-slate-400 font-mono">)</span>
+                      </div>
+                      <span className="text-slate-500 font-bold">=</span>
+                      <div
+                        className={`rounded-xl px-4 py-2 font-mono font-bold text-lg ${
+                          financialSummary.rentabilidadNeta >= 0
+                            ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/20"
+                            : "bg-red-500/15 border border-red-500/30 text-red-300"
+                        }`}
+                      >
+                        {formatCurrency(financialSummary.rentabilidadNeta)}
+                      </div>
                     </div>
-                    <span className="text-slate-500 font-bold">−</span>
-                    <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
-                      <span className="text-slate-400 font-mono">(</span>
-                      <span className="text-red-300 font-mono font-semibold" title="Repuestos">
-                        {formatCurrency(financialSummary.totalGastosRepuestos)}
-                      </span>
-                      <span className="text-slate-400 font-mono">+</span>
-                      <span className="text-amber-300 font-mono font-semibold" title="Aceite">
-                        {formatCurrency(financialSummary.totalMantenimientoAceite)}
-                      </span>
-                      <span className="text-slate-400 font-mono">)</span>
-                    </div>
-                    <span className="text-slate-500 font-bold">=</span>
-                    <div
-                      className={`rounded-xl px-4 py-2 font-mono font-bold text-lg ${
-                        financialSummary.rentabilidadNeta >= 0
-                          ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/20"
-                          : "bg-red-500/15 border border-red-500/30 text-red-300"
-                      }`}
-                    >
-                      {formatCurrency(financialSummary.rentabilidadNeta)}
-                    </div>
-                  </div>
-                </section>
+                  </section>
+
+                  <UpdateMileageCard 
+                    unidadId={unidad.id} 
+                    kilometrajeActual={unidad.kilometraje_actual} 
+                  />
+                </div>
               </>
             )}
 
@@ -345,6 +502,26 @@ export default async function DashboardPage({
                       Historial de Compras
                     </h3>
                     <SparePartsTable gastos={ultimosGastos as GastoRepuesto[]} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* TAB: MANO DE OBRA */}
+            {activeTab === "mano-obra" && (
+              <section>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Registrar Mano de Obra
+                    </h3>
+                    <ManoObraForm unidadId={unidad.id} />
+                  </div>
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Historial de Servicios
+                    </h3>
+                    <ManoObraTable gastos={ultimosGastosManoObra} />
                   </div>
                 </div>
               </section>

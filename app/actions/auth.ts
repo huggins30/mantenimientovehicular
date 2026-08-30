@@ -7,7 +7,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/types";
 
 // -------------------------------------------------------
@@ -25,7 +25,7 @@ export async function signInAction(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return {
@@ -34,6 +34,29 @@ export async function signInAction(
         ? "Credenciales inválidas. Verifica tu email y contraseña."
         : `Error al iniciar sesión: ${error.message}`,
     };
+  }
+
+  // Verificar si el usuario está habilitado por el administrador
+  if (signInData?.user) {
+    const { data: perfil } = await supabaseAdmin
+      .from("perfiles")
+      .select("habilitado, rol")
+      .eq("id", signInData.user.id)
+      .single();
+
+    if (perfil && !perfil.habilitado) {
+      // Cerrar sesión y redirigir a página de espera
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: "Tu cuenta aún no ha sido habilitada. Contacta al administrador.",
+      };
+    }
+
+    if (perfil?.rol === "admin") {
+      revalidatePath("/", "layout");
+      redirect("/admin");
+    }
   }
 
   revalidatePath("/", "layout");
@@ -67,9 +90,7 @@ export async function signUpAction(
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback`,
-    },
+    // Sin emailRedirectTo: el admin habilita las cuentas manualmente
   });
 
   if (error) {

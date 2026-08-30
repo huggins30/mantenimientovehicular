@@ -10,8 +10,8 @@ interface FinancialSummaryCardProps {
   title: string;
   amount: number;
   icon: LucideIcon;
-  /** Paleta de colores: income | expense | maintenance | profit */
-  variant: "income" | "expense" | "maintenance" | "profit";
+  /** Paleta de colores: income | expense | maintenance | labor | profit */
+  variant: "income" | "expense" | "maintenance" | "labor" | "profit";
   subtitle?: string;
 }
 
@@ -42,6 +42,15 @@ const variantConfig = {
     amountColor: "text-amber-400",
     badge: "bg-amber-500/20 text-amber-300",
     badgeText: "Servicio",
+  },
+  labor: {
+    gradient: "from-orange-500/20 to-orange-600/10",
+    border: "border-orange-500/30",
+    iconBg: "bg-orange-500/20",
+    iconColor: "text-orange-400",
+    amountColor: "text-orange-400",
+    badge: "bg-orange-500/20 text-orange-300",
+    badgeText: "Mano Obra",
   },
   profit: {
     gradient: "from-violet-500/20 to-violet-600/10",

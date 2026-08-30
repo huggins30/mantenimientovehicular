@@ -9,15 +9,20 @@ import {
   TrendingUp,
   Car,
   Menu,
-  X
+  X,
+  Shield,
+  Globe,
+  Hammer,
 } from "lucide-react";
 import { useState } from "react";
 
 interface SidebarProps {
   activeUnidadId: number;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ activeUnidadId }: SidebarProps) {
+
+export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "resumen";
   const [isOpen, setIsOpen] = useState(false);
@@ -46,6 +51,12 @@ export function Sidebar({ activeUnidadId }: SidebarProps) {
       label: "Piezas y Repuestos",
       icon: Package,
       description: "Historial de gastos",
+    },
+    {
+      id: "mano-obra",
+      label: "Mano de Obra",
+      icon: Hammer,
+      description: "Servicios mecánicos",
     },
   ];
 
@@ -98,6 +109,44 @@ export function Sidebar({ activeUnidadId }: SidebarProps) {
 
           {/* Nav */}
           <nav className="flex-1 space-y-2 p-4">
+            <Link
+              href={`/?tab=general`}
+              onClick={() => setIsOpen(false)}
+              className={`
+                group flex items-center gap-4 rounded-xl px-4 py-3 transition-all duration-200 mb-2
+                ${
+                  activeTab === "general"
+                    ? "bg-emerald-500/15 ring-1 ring-emerald-500/30"
+                    : "hover:bg-white/5"
+                }
+              `}
+            >
+              <div
+                className={`
+                  flex h-10 w-10 items-center justify-center rounded-lg transition-colors
+                  ${
+                    activeTab === "general"
+                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                      : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
+                  }
+                `}
+              >
+                <Globe className="h-5 w-5" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    activeTab === "general" ? "text-emerald-300 font-bold" : "text-slate-300"
+                  }`}
+                >
+                  Resumen General
+                </p>
+                <p className="text-xs text-slate-500">Todas las unidades</p>
+              </div>
+            </Link>
+
+            <div className="h-px bg-white/10 my-2" />
+
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -143,7 +192,20 @@ export function Sidebar({ activeUnidadId }: SidebarProps) {
             })}
           </nav>
           
-          <div className="p-4 border-t border-white/10">
+          <div className="p-4 border-t border-white/10 space-y-3">
+            {/* Enlace al panel admin (solo para administradores) */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-violet-300 bg-violet-500/10 ring-1 ring-violet-500/20 hover:bg-violet-500/20 transition-all duration-200"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20">
+                  <Shield className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
+                </div>
+                Panel de Admin
+              </Link>
+            )}
             <p className="text-center text-xs text-slate-600">
               MantenimientoVehicular © {new Date().getFullYear()}
             </p>

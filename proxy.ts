@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -34,8 +34,10 @@ export async function middleware(request: NextRequest) {
 
   // Rutas públicas — no requieren sesión
   const isAuthRoute = pathname.startsWith("/auth");
+  // /pendiente es accesible sin sesión activa (usuario rechazado o en espera)
+  const isPendienteRoute = pathname.startsWith("/pendiente");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPendienteRoute) {
     // Sin sesión → redirigir al login
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";

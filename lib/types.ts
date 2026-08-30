@@ -62,6 +62,21 @@ export interface GastoRepuesto {
 }
 
 // -------------------------------------------------------
+// Tabla: gastos_mano_obra
+// Registro de gastos por mano de obra por unidad
+// -------------------------------------------------------
+export interface GastoManoObra {
+  id: number;
+  user_id: string;
+  unidad_id: number;
+  concepto: string;
+  costo: number;
+  fecha: string; // ISO date string
+  notas?: string;
+  created_at?: string;
+}
+
+// -------------------------------------------------------
 // Tabla: ingresos_unidad
 // Registro de ingresos (fletes, pasajes, etc.)
 // -------------------------------------------------------
@@ -101,7 +116,8 @@ export interface FinancialSummary {
   totalIngresos: number;
   totalGastosRepuestos: number;
   totalMantenimientoAceite: number;
-  /** Fórmula: totalIngresos - (totalGastosRepuestos + totalMantenimientoAceite) */
+  totalManoObra: number;
+  /** Fórmula: totalIngresos - (totalGastosRepuestos + totalMantenimientoAceite + totalManoObra) */
   rentabilidadNeta: number;
 }
 
@@ -112,6 +128,7 @@ export interface DashboardData {
   oilChangeStatus: OilChangeStatusData;
   ultimosMantenimientos: MantenimientoAceite[];
   ultimosGastos: GastoRepuesto[];
+  ultimosGastosManoObra: GastoManoObra[];
   ultimosIngresos: IngresoUnidad[];
 }
 
@@ -121,3 +138,22 @@ export interface ActionResult<T = null> {
   data?: T;
   error?: string;
 }
+
+// -------------------------------------------------------
+// Tabla: perfiles
+// Extiende auth.users con rol, habilitado y límite de unidades
+// -------------------------------------------------------
+export interface Perfil {
+  id: string; // UUID, referencia a auth.users(id)
+  email: string;
+  rol: "admin" | "usuario";
+  habilitado: boolean;
+  max_unidades: number;
+  created_at?: string;
+}
+
+/** Vista extendida para el panel de admin: perfil + conteo de unidades */
+export interface AdminUsuario extends Perfil {
+  total_unidades?: number;
+}
+
