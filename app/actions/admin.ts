@@ -112,6 +112,14 @@ export async function toggleHabilitadoAction(
     .update({ habilitado })
     .eq("id", userId);
 
+  // Si se está habilitando al usuario, asegurarse de que su correo quede confirmado
+  // para evitar el error "Email not confirmed" (útil para usuarios creados antes del cambio)
+  if (habilitado && !error) {
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+    });
+  }
+
   if (error) {
     return {
       success: false,

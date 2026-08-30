@@ -86,11 +86,11 @@ export async function signUpAction(
     return { success: false, error: "Las contraseñas no coinciden." };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({
+  // Usar supabaseAdmin para auto-confirmar el correo (evita que el usuario tenga que verificar su email)
+  const { error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    // Sin emailRedirectTo: el admin habilita las cuentas manualmente
+    email_confirm: true,
   });
 
   if (error) {
