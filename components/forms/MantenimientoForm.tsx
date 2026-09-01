@@ -8,7 +8,7 @@
 
 import { useActionState, useState, useEffect } from "react";
 import { registrarMantenimientoAction } from "@/app/actions/mantenimiento";
-import type { ActionResult, Unidad } from "@/lib/types";
+import type { ActionResult, Unidad, RegistroMantenimiento } from "@/lib/types";
 import {
   Package,
   Hammer,
@@ -28,7 +28,7 @@ interface MantenimientoFormProps {
   unidad: Unidad;
 }
 
-const initialState: ActionResult = { success: false };
+const initialState: ActionResult<RegistroMantenimiento> = { success: false };
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-PE", {
@@ -47,8 +47,10 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
   const [cantidad, setCantidad] = useState(1);
   const [costoUnitario, setCostoUnitario] = useState(0);
   const [costoMano, setCostoMano] = useState(0);
+  const [tasaCambio, setTasaCambio] = useState(0);
   const montoRepuesto = cantidad * costoUnitario;
   const totalGeneral = montoRepuesto + costoMano;
+  const costoBolivares = totalGeneral * tasaCambio;
 
   const [showSuccess, setShowSuccess] = useState(false);
   useEffect(() => {
@@ -253,7 +255,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                required
+                defaultValue={0}
                 onChange={(e) => setCostoMano(Number(e.target.value) || 0)}
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
               />
@@ -261,15 +263,47 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
           </div>
         </div>
 
-        {/* ── Total General ── */}
-        <div className="flex items-center justify-between rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-violet-400/80">
-            <Calculator className="h-3.5 w-3.5" />
-            <span>Total del mantenimiento (repuesto + mano de obra)</span>
+        {/* ── Tasa de Cambio ── */}
+        <div className="space-y-1.5">
+          <label htmlFor="tasa_cambio" className="block text-xs font-medium text-slate-400">
+            Tasa Bs/USD <span className="text-red-400">*</span>
+          </label>
+          <div className="relative">
+            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+            <input
+              id="tasa_cambio"
+              name="tasa_cambio"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Ej: 36.50"
+              required
+              value={tasaCambio || ""}
+              onChange={(e) => setTasaCambio(Number(e.target.value) || 0)}
+              className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/40"
+            />
           </div>
-          <span className="font-mono text-base font-bold text-violet-300">
-            {formatCurrency(totalGeneral)}
-          </span>
+        </div>
+
+        {/* ── Total General ── */}
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-violet-400/80">
+              <Calculator className="h-3.5 w-3.5" />
+              <span>Total (repuesto + mano de obra)</span>
+            </div>
+            <span className="font-mono text-base font-bold text-violet-300">
+              {formatCurrency(totalGeneral)}
+            </span>
+          </div>
+          {tasaCambio > 0 && (
+            <div className="flex items-center justify-between border-t border-violet-500/20 pt-2">
+              <span className="text-xs text-cyan-400/80">Total en Bs (× {tasaCambio.toFixed(2)})</span>
+              <span className="font-mono text-sm font-bold text-cyan-300">
+                Bs. {costoBolivares.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Notas ── */}

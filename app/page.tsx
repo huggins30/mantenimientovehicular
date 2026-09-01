@@ -28,11 +28,14 @@ import { MantenimientoTable } from "@/components/dashboard/MantenimientoTable";
 import { GlobalUnitSummaryTable } from "@/components/dashboard/GlobalUnitSummaryTable";
 import { IncomeForm } from "@/components/forms/IncomeForm";
 import { IncomeTable } from "@/components/dashboard/IncomeTable";
+import { ComprasDolaresForm } from "@/components/forms/ComprasDolaresForm";
+import { ComprasDolaresTable } from "@/components/dashboard/ComprasDolaresTable";
 import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
 import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import type { IngresoUnidad, RegistroMantenimiento } from "@/lib/types";
+import { getComprasDolaresByUnidad } from "@/app/actions/dolares";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares } from "@/lib/types";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-PE", {
@@ -133,6 +136,12 @@ export default async function DashboardPage({
     }
   } catch (err) {
     error = err instanceof Error ? err.message : "Error al cargar datos.";
+  }
+
+  // Compras de dólares (tab específica)
+  let comprasDolares: ComprasDolares[] = [];
+  if (activeTab === "dolares" && !error) {
+    comprasDolares = await getComprasDolaresByUnidad(activeUnidadId);
   }
 
   if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad")) {
@@ -238,6 +247,7 @@ export default async function DashboardPage({
                 {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.placa}`}
                 {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.placa}`}
                 {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.placa}`}
+                {activeTab === "dolares" && `Compra de Dólares: ${unidad?.placa}`}
                 {activeTab === "datos" && `Datos de la Unidad: ${unidad?.placa}`}
               </h2>
               <p className="mt-1 text-slate-400 text-sm">
@@ -503,6 +513,26 @@ export default async function DashboardPage({
                     <MantenimientoTable
                       registros={ultimosRegistrosMantenimiento as RegistroMantenimiento[]}
                     />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* TAB: COMPRA DE DÓLARES */}
+            {activeTab === "dolares" && unidad && (
+              <section>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Nueva Compra
+                    </h3>
+                    <ComprasDolaresForm unidad={unidad} />
+                  </div>
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Historial de Compras
+                    </h3>
+                    <ComprasDolaresTable compras={comprasDolares as ComprasDolares[]} />
                   </div>
                 </div>
               </section>

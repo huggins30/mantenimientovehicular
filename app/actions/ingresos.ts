@@ -35,8 +35,16 @@ export async function registrarIngresoAction(
   const efectivo  = Number(formData.get("efectivo"))    || 0;
   const otros     = Number(formData.get("otros"))       || 0;
 
+  const nombreOperador = String(formData.get("nombre_operador") ?? "").trim();
+  const nombreColector = String(formData.get("nombre_colector") ?? "").trim();
+  const kilometrajeActual = Number(formData.get("kilometraje_actual")) || null;
+
   // El total es la suma de todas las formas de pago
-  const montoIngreso = pagoMovil + movi + dolares + efectivo + otros;
+  const totalRecaudado = pagoMovil + movi + dolares + efectivo + otros;
+  const ahorroUnidad = totalRecaudado * 0.25;
+  const colector = (totalRecaudado - ahorroUnidad) * 0.08;
+  const operador = (totalRecaudado - ahorroUnidad) * 0.08;
+  const montoIngreso = totalRecaudado - ahorroUnidad - colector - operador;
 
   if (!concepto) {
     return { success: false, error: "El concepto (motivo del ingreso) es requerido." };
@@ -62,12 +70,31 @@ export async function registrarIngresoAction(
       dolares,
       efectivo,
       otros,
+      nombre_operador: nombreOperador || null,
+      nombre_colector: nombreColector || null,
+      kilometraje_actual: kilometrajeActual,
     })
     .select()
     .single();
 
   if (error) {
     return { success: false, error: `Error al guardar el ingreso: ${error.message}` };
+  }
+
+  // Actualizar el kilometraje de la unidad si es mayor
+  if (kilometrajeActual) {
+    const { data: unidad } = await supabase
+      .from("unidades")
+      .select("kilometraje_actual")
+      .eq("id", unidadId)
+      .single();
+      
+    if (unidad && kilometrajeActual > (unidad.kilometraje_actual || 0)) {
+      await supabase
+        .from("unidades")
+        .update({ kilometraje_actual: kilometrajeActual })
+        .eq("id", unidadId);
+    }
   }
 
   revalidatePath("/");

@@ -13,6 +13,7 @@ import {
   Shield,
   Globe,
   Settings,
+  DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -57,6 +58,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       label: "Piezas y Repuestos",
       icon: Package,
       description: "Repuestos y mano de obra",
+    },
+    {
+      id: "dolares",
+      label: "Compra de Dólares",
+      icon: DollarSign,
+      description: "Registro de divisas",
     },
   ];
 

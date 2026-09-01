@@ -87,7 +87,7 @@ export function ManoObraForm({ unidadId }: ManoObraFormProps) {
                 type="number"
                 min="0"
                 step="0.01"
-                required
+                defaultValue={0}
                 placeholder="0.00"
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-10 pr-4 py-3 text-sm text-white outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
               />

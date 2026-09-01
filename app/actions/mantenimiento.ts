@@ -34,6 +34,9 @@ export async function registrarMantenimientoAction(
   const moConcepto     = String(formData.get("mo_concepto") ?? "").trim();
   const moCosto        = Number(formData.get("mo_costo"));
 
+  // ── Tasa de Cambio ──────────────────────────────────────
+  const tasaCambio     = Number(formData.get("tasa_cambio"));
+
   // ── Validaciones ────────────────────────────────────────
   if (!fecha)
     return { success: false, error: "La fecha es requerida." };
@@ -47,6 +50,8 @@ export async function registrarMantenimientoAction(
     return { success: false, error: "El concepto de mano de obra es requerido." };
   if (isNaN(moCosto) || moCosto < 0)
     return { success: false, error: "El costo de mano de obra no puede ser negativo." };
+  if (isNaN(tasaCambio) || tasaCambio <= 0)
+    return { success: false, error: "La tasa de cambio debe ser mayor a 0." };
 
   // ── Insertar registro unificado ─────────────────────────
   const { data, error } = await supabase
@@ -60,6 +65,7 @@ export async function registrarMantenimientoAction(
       rep_costo_unitario: repCostoUnit,
       mo_concepto:       moConcepto,
       mo_costo:          moCosto,
+      tasa_cambio:       tasaCambio,
       proveedor:         proveedor || null,
       notas:             notas || null,
     })

@@ -122,6 +122,25 @@ export interface IngresoUnidad {
   // Calculados
   ahorro_unidad?: number;
   colector?: number;
+  nombre_operador?: string;
+  nombre_colector?: string;
+  kilometraje_actual?: number;
+  created_at?: string;
+}
+
+// -------------------------------------------------------
+// Tabla: compras_dolares
+// Registro de compras de divisas (dólares) por unidad
+// -------------------------------------------------------
+export interface ComprasDolares {
+  id: number;
+  user_id: string;
+  unidad_id: number;
+  fecha: string;            // ISO date string
+  cantidad_dolares: number; // Monto en USD
+  tasa_cambio: number;      // Tasa Bs/USD del momento
+  costo_bolivares: number;  // Calculado: cantidad_dolares * tasa_cambio
+  notas?: string;
   created_at?: string;
 }
 

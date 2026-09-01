@@ -24,6 +24,7 @@ import {
   PiggyBank,
   User,
   Calculator,
+  Gauge,
 } from "lucide-react";
 
 interface IncomeFormProps {
@@ -81,6 +82,8 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
   const total = Object.values(values).reduce((s, v) => s + v, 0);
   const ahorroUnidad = total * 0.25;
   const colector = (total - ahorroUnidad) * 0.08;
+  const operador = (total - ahorroUnidad) * 0.08;
+  const ingresoARegistrar = total - ahorroUnidad - colector - operador;
 
   const [showSuccess, setShowSuccess] = useState(false);
   useEffect(() => {
@@ -127,7 +130,7 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
       <form action={action} className="space-y-4">
         <input type="hidden" name="unidad_id" value={unidad.id} />
 
-        {/* Concepto + Fecha */}
+        {/* Concepto + Fecha + Kilometraje */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
             <label htmlFor="concepto" className="block text-xs font-medium text-slate-400">
@@ -147,6 +150,24 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
           </div>
 
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
+            <label htmlFor="kilometraje_actual" className="block text-xs font-medium text-slate-400">
+              Kilometraje Actual <span className="text-red-400">*</span>
+            </label>
+            <div className="relative">
+              <Gauge className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <input
+                id="kilometraje_actual"
+                name="kilometraje_actual"
+                type="number"
+                defaultValue={unidad.kilometraje_actual || ""}
+                required
+                placeholder="Ej: 150000"
+                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 col-span-2 sm:col-span-1">
             <label htmlFor="fecha" className="block text-xs font-medium text-slate-400">
               Fecha <span className="text-red-400">*</span>
             </label>
@@ -159,6 +180,38 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
                 defaultValue={today}
                 required
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-1.5 col-span-2 sm:col-span-1">
+            <label htmlFor="nombre_operador" className="block text-xs font-medium text-slate-400">
+              Nombre del Operador
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <input
+                id="nombre_operador"
+                name="nombre_operador"
+                type="text"
+                placeholder="Ej: Juan Pérez"
+                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 col-span-2 sm:col-span-1">
+            <label htmlFor="nombre_colector" className="block text-xs font-medium text-slate-400">
+              Nombre del Colector
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <input
+                id="nombre_colector"
+                name="nombre_colector"
+                type="text"
+                placeholder="Ej: Pedro Gómez"
+                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
               />
             </div>
           </div>
@@ -228,6 +281,18 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
                   </p>
                   <p className="font-mono font-semibold text-orange-300">{formatCurrency(colector)}</p>
                 </div>
+                <div>
+                  <p className="flex items-center gap-1.5 text-slate-400 mb-0.5">
+                    <User className="h-3.5 w-3.5 text-amber-400" /> Operador (8%)
+                  </p>
+                  <p className="font-mono font-semibold text-amber-300">{formatCurrency(operador)}</p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1.5 text-emerald-400 mb-0.5">
+                    <Banknote className="h-3.5 w-3.5 text-emerald-400" /> Ingreso a Registrar
+                  </p>
+                  <p className="font-mono font-semibold text-emerald-300">{formatCurrency(ingresoARegistrar)}</p>
+                </div>
               </div>
             )}
           </div>
@@ -260,7 +325,7 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
           ) : (
             <>
               <Plus className="h-4 w-4" />
-              Registrar Ingreso {total > 0 && `— ${formatCurrency(total)}`}
+              Registrar Ingreso {total > 0 && `— ${formatCurrency(ingresoARegistrar)}`}
             </>
           )}
         </button>
