@@ -14,6 +14,7 @@ import type {
   OilChangeStatusData,
   Unidad,
   GastoManoObra,
+  RegistroMantenimiento,
 } from "@/lib/types";
 
 // -------------------------------------------------------
@@ -60,7 +61,7 @@ export async function getDashboardData(
 
   // Consultas paralelas para máximo rendimiento
   // El RLS de Supabase garantiza que solo se retornan datos del usuario
-  const [unidadRes, ingresosRes, gastosRes, mantenimientosRes, manoObraRes] =
+  const [unidadRes, ingresosRes, mantenimientosRes, registrosMantenimientoRes] =
     await Promise.all([
       supabase
         .from("unidades")
@@ -77,13 +78,6 @@ export async function getDashboardData(
         .order("fecha", { ascending: false }),
 
       supabase
-        .from("gastos_repuestos")
-        .select("*")
-        .eq("unidad_id", unidadId)
-        .eq("user_id", user.id)
-        .order("fecha_compra", { ascending: false }),
-
-      supabase
         .from("mantenimientos_aceite")
         .select("*")
         .eq("unidad_id", unidadId)
@@ -91,7 +85,7 @@ export async function getDashboardData(
         .order("fecha_servicio", { ascending: false }),
 
       supabase
-        .from("gastos_mano_obra")
+        .from("registros_mantenimiento")
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
@@ -107,40 +101,36 @@ export async function getDashboardData(
 
   const unidad: Unidad = unidadRes.data;
   const ingresos = ingresosRes.data ?? [];
-  const gastos = gastosRes.data ?? [];
   const mantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
-  const manoObra = (manoObraRes.data ?? []) as GastoManoObra[];
+  const registrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
 
   // ---- Cálculos financieros ----
   const totalIngresos = ingresos.reduce(
     (sum, i) => sum + (i.monto_ingreso ?? 0),
     0
   );
-  const totalGastosRepuestos = gastos.reduce(
-    (sum, g) => sum + (g.monto_total ?? 0),
+  // Los gastos de mantenimiento (repuesto + mano de obra) ya vienen unidos en costo_total
+  const totalGastosMantenimiento = registrosMantenimiento.reduce(
+    (sum, r) => sum + (r.costo_total ?? 0),
     0
   );
   const totalMantenimientoAceite = mantenimientos.reduce(
     (sum, m) => sum + (m.costo_servicio ?? 0),
     0
   );
-  const totalManoObra = manoObra.reduce(
-    (sum, m) => sum + (m.costo ?? 0),
-    0
-  );
-  
+
   const rentabilidadNeta = await calcularRentabilidadNeta(
     totalIngresos,
-    totalGastosRepuestos,
+    totalGastosMantenimiento,
     totalMantenimientoAceite,
-    totalManoObra
+    0  // ya no hay mano de obra separada
   );
 
   const financialSummary: FinancialSummary = {
     totalIngresos,
-    totalGastosRepuestos,
+    totalGastosRepuestos: totalGastosMantenimiento, // repuesto + mano de obra unidos
     totalMantenimientoAceite,
-    totalManoObra,
+    totalManoObra: 0,
     rentabilidadNeta,
   };
 
@@ -166,9 +156,10 @@ export async function getDashboardData(
     financialSummary,
     oilChangeStatus,
     ultimosMantenimientos: mantenimientos.slice(0, 5),
-    ultimosGastos: gastos,       // todos para el módulo de piezas
-    ultimosGastosManoObra: manoObra,
-    ultimosIngresos: ingresos,   // todos para el módulo de ingresos
+    ultimosGastos: [],
+    ultimosGastosManoObra: [],
+    ultimosIngresos: ingresos,
+    ultimosRegistrosMantenimiento: registrosMantenimiento,
   };
 }
 
@@ -218,25 +209,23 @@ export async function getGlobalDashboardData(): Promise<{
     throw new Error("No estás autenticado. Por favor inicia sesión.");
   }
 
-  const [unidadesRes, ingresosRes, gastosRes, mantenimientosRes, manoObraRes] = await Promise.all([
-    supabase.from("unidades").select("id, placa, marca, modelo").eq("user_id", user.id),
+  const [unidadesRes, ingresosRes, mantenimientosRes, registrosMantenimientoRes] = await Promise.all([
+    supabase.from("unidades").select("id, placa, marca, modelo, numero_unidad").eq("user_id", user.id),
     supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso").eq("user_id", user.id),
-    supabase.from("gastos_repuestos").select("unidad_id, monto_total").eq("user_id", user.id),
     supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio").eq("user_id", user.id),
-    supabase.from("gastos_mano_obra").select("unidad_id, costo").eq("user_id", user.id),
+    supabase.from("registros_mantenimiento").select("unidad_id, costo_total").eq("user_id", user.id),
   ]);
 
   const unidades = unidadesRes.data ?? [];
   const ingresos = ingresosRes.data ?? [];
-  const gastos = gastosRes.data ?? [];
   const mantenimientos = mantenimientosRes.data ?? [];
-  const manoObra = manoObraRes.data ?? [];
+  const registrosMantenimiento = registrosMantenimientoRes.data ?? [];
 
   // Totales globales
   const totalIngresos = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
-  const totalGastosRepuestos = gastos.reduce((sum, g) => sum + (g.monto_total ?? 0), 0);
+  const totalGastosRepuestos = registrosMantenimiento.reduce((sum, r) => sum + (r.costo_total ?? 0), 0);
   const totalMantenimientoAceite = mantenimientos.reduce((sum, m) => sum + (m.costo_servicio ?? 0), 0);
-  const totalManoObra = manoObra.reduce((sum, m) => sum + (m.costo ?? 0), 0);
+  const totalManoObra = 0; // ahora está incluido en totalGastosRepuestos
   
   const rentabilidadNeta = await calcularRentabilidadNeta(
     totalIngresos,
@@ -249,10 +238,9 @@ export async function getGlobalDashboardData(): Promise<{
   const resumenPorUnidad: ResumenPorUnidad[] = unidades.map((u) => {
     const uid = u.id;
     const uIngresos = ingresos.filter(i => i.unidad_id === uid).reduce((s, i) => s + (i.monto_ingreso ?? 0), 0);
-    const uGastos = gastos.filter(g => g.unidad_id === uid).reduce((s, g) => s + (g.monto_total ?? 0), 0);
+    const uGastos = registrosMantenimiento.filter(r => r.unidad_id === uid).reduce((s, r) => s + (r.costo_total ?? 0), 0);
     const uAceite = mantenimientos.filter(m => m.unidad_id === uid).reduce((s, m) => s + (m.costo_servicio ?? 0), 0);
-    const uManoObra = manoObra.filter(m => m.unidad_id === uid).reduce((s, m) => s + (m.costo ?? 0), 0);
-    const uRentabilidad = uIngresos - (uGastos + uAceite + uManoObra);
+    const uRentabilidad = uIngresos - (uGastos + uAceite);
     return {
       unidad_id: uid,
       placa: u.placa,
@@ -261,7 +249,7 @@ export async function getGlobalDashboardData(): Promise<{
       totalIngresos: uIngresos,
       totalGastosRepuestos: uGastos,
       totalMantenimientoAceite: uAceite,
-      totalManoObra: uManoObra,
+      totalManoObra: 0,
       rentabilidadNeta: uRentabilidad,
     };
   });

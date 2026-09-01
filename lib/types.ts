@@ -9,6 +9,7 @@
 export interface Unidad {
   id: number;
   user_id: string; // UUID del usuario propietario
+  numero_unidad: string;
   placa: string;
   marca: string;
   modelo: string;
@@ -77,6 +78,30 @@ export interface GastoManoObra {
 }
 
 // -------------------------------------------------------
+// Tabla: registros_mantenimiento
+// Registro unificado de repuesto + mano de obra
+// -------------------------------------------------------
+export interface RegistroMantenimiento {
+  id: number;
+  user_id: string;
+  unidad_id: number;
+  fecha: string; // ISO date string
+  // Pieza / Repuesto
+  rep_concepto: string;
+  rep_cantidad: number;
+  rep_costo_unitario: number;
+  rep_subtotal: number; // calculado por DB
+  // Mano de obra
+  mo_concepto: string;
+  mo_costo: number;
+  // Total calculado por DB: rep_subtotal + mo_costo
+  costo_total: number;
+  proveedor?: string;
+  notas?: string;
+  created_at?: string;
+}
+
+// -------------------------------------------------------
 // Tabla: ingresos_unidad
 // Registro de ingresos (fletes, pasajes, etc.)
 // -------------------------------------------------------
@@ -88,6 +113,15 @@ export interface IngresoUnidad {
   monto_ingreso: number;
   fecha: string; // ISO date string
   comprobante?: string;
+  // Formas de pago
+  pago_movil: number;
+  movi: number;
+  dolares: number;
+  efectivo: number;
+  otros: number;
+  // Calculados
+  ahorro_unidad?: number;
+  colector?: number;
   created_at?: string;
 }
 
@@ -130,6 +164,7 @@ export interface DashboardData {
   ultimosGastos: GastoRepuesto[];
   ultimosGastosManoObra: GastoManoObra[];
   ultimosIngresos: IngresoUnidad[];
+  ultimosRegistrosMantenimiento: RegistroMantenimiento[];
 }
 
 /** Resultado genérico de un Server Action */

@@ -23,17 +23,16 @@ import { FinancialSummaryCard } from "@/components/dashboard/FinancialSummaryCar
 import { UpdateMileageCard } from "@/components/dashboard/UpdateMileageCard";
 import { OilChangeWidget } from "@/components/dashboard/OilChangeWidget";
 import { OilChangeForm } from "@/components/forms/OilChangeForm";
-import { SparePartsForm } from "@/components/forms/SparePartsForm";
-import { SparePartsTable } from "@/components/dashboard/SparePartsTable";
-import { ManoObraForm } from "@/components/forms/ManoObraForm";
-import { ManoObraTable } from "@/components/dashboard/ManoObraTable";
+import { MantenimientoForm } from "@/components/forms/MantenimientoForm";
+import { MantenimientoTable } from "@/components/dashboard/MantenimientoTable";
 import { GlobalUnitSummaryTable } from "@/components/dashboard/GlobalUnitSummaryTable";
 import { IncomeForm } from "@/components/forms/IncomeForm";
 import { IncomeTable } from "@/components/dashboard/IncomeTable";
 import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
+import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import type { GastoRepuesto, IngresoUnidad } from "@/lib/types";
+import type { IngresoUnidad, RegistroMantenimiento } from "@/lib/types";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-PE", {
@@ -153,9 +152,8 @@ export default async function DashboardPage({
     unidad, 
     financialSummary, 
     oilChangeStatus, 
-    ultimosGastos, 
-    ultimosGastosManoObra,
-    ultimosIngresos 
+    ultimosIngresos,
+    ultimosRegistrosMantenimiento,
   } = dashboardData || {};
 
   // Render principal con Layout (Sidebar + Main)
@@ -240,6 +238,7 @@ export default async function DashboardPage({
                 {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.placa}`}
                 {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.placa}`}
                 {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.placa}`}
+                {activeTab === "datos" && `Datos de la Unidad: ${unidad?.placa}`}
               </h2>
               <p className="mt-1 text-slate-400 text-sm">
                 {activeTab === "general" 
@@ -487,43 +486,32 @@ export default async function DashboardPage({
               </section>
             )}
 
-            {/* TAB: REPUESTOS */}
+            {/* TAB: REPUESTOS + MANO DE OBRA (combinado) */}
             {activeTab === "repuestos" && (
               <section>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[420px_1fr]">
                   <div>
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Registrar Nueva Compra
+                      Registrar Mantenimiento
                     </h3>
-                    <SparePartsForm unidad={unidad} />
+                    <MantenimientoForm unidad={unidad} />
                   </div>
                   <div>
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Historial de Compras
+                      Historial de Mantenimientos
                     </h3>
-                    <SparePartsTable gastos={ultimosGastos as GastoRepuesto[]} />
+                    <MantenimientoTable
+                      registros={ultimosRegistrosMantenimiento as RegistroMantenimiento[]}
+                    />
                   </div>
                 </div>
               </section>
             )}
 
-            {/* TAB: MANO DE OBRA */}
-            {activeTab === "mano-obra" && (
-              <section>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
-                  <div>
-                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Registrar Mano de Obra
-                    </h3>
-                    <ManoObraForm unidadId={unidad.id} />
-                  </div>
-                  <div>
-                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Historial de Servicios
-                    </h3>
-                    <ManoObraTable gastos={ultimosGastosManoObra} />
-                  </div>
-                </div>
+            {/* TAB: DATOS DE LA UNIDAD */}
+            {activeTab === "datos" && unidad && (
+              <section className="py-6">
+                <EditUnitForm unidad={unidad} />
               </section>
             )}
 

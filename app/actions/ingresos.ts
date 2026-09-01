@@ -23,17 +23,26 @@ export async function registrarIngresoAction(
     return { success: false, error: "No estás autenticado." };
   }
 
-  const unidadId = Number(formData.get("unidad_id"));
-  const concepto = String(formData.get("concepto") ?? "").trim();
-  const montoIngreso = Number(formData.get("monto_ingreso"));
-  const fecha = String(formData.get("fecha") ?? "");
+  const unidadId   = Number(formData.get("unidad_id"));
+  const concepto   = String(formData.get("concepto") ?? "").trim();
+  const fecha      = String(formData.get("fecha") ?? "");
   const comprobante = String(formData.get("comprobante") ?? "").trim();
+
+  // Formas de pago
+  const pagoMovil = Number(formData.get("pago_movil"))  || 0;
+  const movi      = Number(formData.get("movi"))        || 0;
+  const dolares   = Number(formData.get("dolares"))     || 0;
+  const efectivo  = Number(formData.get("efectivo"))    || 0;
+  const otros     = Number(formData.get("otros"))       || 0;
+
+  // El total es la suma de todas las formas de pago
+  const montoIngreso = pagoMovil + movi + dolares + efectivo + otros;
 
   if (!concepto) {
     return { success: false, error: "El concepto (motivo del ingreso) es requerido." };
   }
-  if (isNaN(montoIngreso) || montoIngreso <= 0) {
-    return { success: false, error: "El monto debe ser un número positivo mayor a cero." };
+  if (montoIngreso <= 0) {
+    return { success: false, error: "El total debe ser mayor a cero. Ingresa al menos una forma de pago." };
   }
   if (!fecha) {
     return { success: false, error: "La fecha del ingreso es requerida." };
@@ -42,12 +51,17 @@ export async function registrarIngresoAction(
   const { data: ingreso, error } = await supabase
     .from("ingresos_unidad")
     .insert({
-      user_id: user.id,
-      unidad_id: unidadId,
+      user_id:       user.id,
+      unidad_id:     unidadId,
       concepto,
       monto_ingreso: montoIngreso,
       fecha,
-      comprobante: comprobante || null,
+      comprobante:   comprobante || null,
+      pago_movil:    pagoMovil,
+      movi,
+      dolares,
+      efectivo,
+      otros,
     })
     .select()
     .single();
@@ -77,7 +91,7 @@ export async function eliminarIngresoAction(
     .from("ingresos_unidad")
     .delete()
     .eq("id", ingresoId)
-    .eq("user_id", user.id); // Protección RLS y user match
+    .eq("user_id", user.id);
 
   if (error) {
     return { success: false, error: `Error al eliminar: ${error.message}` };

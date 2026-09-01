@@ -32,7 +32,7 @@ export function UnitSwitcher({ unidades, activeUnidadId, canAddUnit = false }: U
             `}
           >
             <div className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
-            {u.placa} — {u.marca} {u.modelo}
+            Unidad {u.numero_unidad || u.placa} — {u.marca} {u.modelo}
           </button>
         );
       })}

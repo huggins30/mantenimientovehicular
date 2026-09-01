@@ -12,7 +12,7 @@ import {
   X,
   Shield,
   Globe,
-  Hammer,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -28,6 +28,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
+    {
+      id: "datos",
+      label: "Datos de la Unidad",
+      icon: Settings,
+      description: "Modificar información",
+    },
     {
       id: "resumen",
       label: "Resumen Financiero",
@@ -50,13 +56,7 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       id: "repuestos",
       label: "Piezas y Repuestos",
       icon: Package,
-      description: "Historial de gastos",
-    },
-    {
-      id: "mano-obra",
-      label: "Mano de Obra",
-      icon: Hammer,
-      description: "Servicios mecánicos",
+      description: "Repuestos y mano de obra",
     },
   ];
 

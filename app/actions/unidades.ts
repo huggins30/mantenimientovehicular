@@ -19,13 +19,14 @@ export async function crearUnidadAction(
   _prevState: ActionResult<Unidad>,
   formData: FormData
 ): Promise<ActionResult<Unidad>> {
+  const numero_unidad = String(formData.get("numero_unidad") ?? "").trim();
   const placa = String(formData.get("placa") ?? "").trim().toUpperCase();
   const marca = String(formData.get("marca") ?? "").trim();
   const modelo = String(formData.get("modelo") ?? "").trim();
   const anio = Number(formData.get("anio"));
   const kilometraje = Number(formData.get("kilometraje_actual"));
 
-  if (!placa || !marca || !modelo || isNaN(anio) || isNaN(kilometraje)) {
+  if (!numero_unidad || !placa || !marca || !modelo || isNaN(anio) || isNaN(kilometraje)) {
     return { success: false, error: "Todos los campos son requeridos y deben ser válidos." };
   }
 
@@ -61,6 +62,7 @@ export async function crearUnidadAction(
     .from("unidades")
     .insert({
       user_id: user.id,
+      numero_unidad,
       placa,
       marca,
       modelo,
@@ -232,4 +234,54 @@ export async function registrarCambioAceiteAction(
     costo_servicio: costoServicio,
     fecha_servicio: fechaServicio,
   });
+}
+
+// -------------------------------------------------------
+// Editar Unidad Existente
+// -------------------------------------------------------
+export async function editarUnidadAction(
+  _prevState: ActionResult<Unidad>,
+  formData: FormData
+): Promise<ActionResult<Unidad>> {
+  const unidadId = Number(formData.get("unidad_id"));
+  const numero_unidad = String(formData.get("numero_unidad") ?? "").trim();
+  const placa = String(formData.get("placa") ?? "").trim().toUpperCase();
+  const marca = String(formData.get("marca") ?? "").trim();
+  const modelo = String(formData.get("modelo") ?? "").trim();
+  const anio = Number(formData.get("anio"));
+
+  if (isNaN(unidadId) || !numero_unidad || !placa || !marca || !modelo || isNaN(anio)) {
+    return { success: false, error: "Todos los campos son requeridos y deben ser válidos." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    return { success: false, error: "No estás autenticado." };
+  }
+
+  const { data, error } = await supabase
+    .from("unidades")
+    .update({
+      numero_unidad,
+      placa,
+      marca,
+      modelo,
+      anio,
+    })
+    .eq("id", unidadId)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') { // Unique violation
+      return { success: false, error: "Ya tienes registrada otra unidad con esta placa." };
+    }
+    return { success: false, error: `Error al actualizar unidad: ${error.message}` };
+  }
+
+  revalidatePath("/");
+  return { success: true, data: data as Unidad };
 }
