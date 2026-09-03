@@ -42,26 +42,26 @@ function formatCurrency(val: number) {
 }
 
 const paymentFields = [
-  { name: "pago_movil", label: "Pago Móvil",  icon: Smartphone,    color: "violet" },
-  { name: "movi",       label: "Movi",         icon: Zap,           color: "blue"   },
-  { name: "dolares",    label: "Dólares",       icon: DollarSign,    color: "emerald"},
-  { name: "efectivo",   label: "Efectivo",      icon: Banknote,      color: "teal"   },
-  { name: "otros",      label: "Otros",         icon: MoreHorizontal,color: "slate"  },
+  { name: "pago_movil", label: "Pago Móvil", icon: Smartphone, color: "violet" },
+  { name: "movi", label: "Movi", icon: Zap, color: "blue" },
+  { name: "dolares", label: "Dólares", icon: DollarSign, color: "emerald" },
+  { name: "efectivo", label: "Efectivo", icon: Banknote, color: "teal" },
+  { name: "otros", label: "Otros", icon: MoreHorizontal, color: "slate" },
 ] as const;
 
 const borderColor: Record<string, string> = {
-  violet:  "focus:border-violet-500/60 focus:ring-violet-500/40",
-  blue:    "focus:border-blue-500/60 focus:ring-blue-500/40",
+  violet: "focus:border-violet-500/60 focus:ring-violet-500/40",
+  blue: "focus:border-blue-500/60 focus:ring-blue-500/40",
   emerald: "focus:border-emerald-500/60 focus:ring-emerald-500/40",
-  teal:    "focus:border-teal-500/60 focus:ring-teal-500/40",
-  slate:   "focus:border-slate-400/60 focus:ring-slate-400/40",
+  teal: "focus:border-teal-500/60 focus:ring-teal-500/40",
+  slate: "focus:border-slate-400/60 focus:ring-slate-400/40",
 };
 const iconColor: Record<string, string> = {
-  violet:  "text-violet-400",
-  blue:    "text-blue-400",
+  violet: "text-violet-400",
+  blue: "text-blue-400",
   emerald: "text-emerald-400",
-  teal:    "text-teal-400",
-  slate:   "text-slate-400",
+  teal: "text-teal-400",
+  slate: "text-slate-400",
 };
 
 export function IncomeForm({ unidad }: IncomeFormProps) {
@@ -82,7 +82,7 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
   const total = Object.values(values).reduce((s, v) => s + v, 0);
   const ahorroUnidad = total * 0.25;
   const colector = (total - ahorroUnidad) * 0.08;
-  const operador = (total - ahorroUnidad) * 0.08;
+  const operador = (total - ahorroUnidad) * 0.25;
   const ingresoARegistrar = total - ahorroUnidad - colector - operador;
 
   const [showSuccess, setShowSuccess] = useState(false);
@@ -183,7 +183,7 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
               />
             </div>
           </div>
-          
+
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
             <label htmlFor="nombre_operador" className="block text-xs font-medium text-slate-400">
               Nombre del Operador
@@ -283,7 +283,7 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
                 </div>
                 <div>
                   <p className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                    <User className="h-3.5 w-3.5 text-amber-400" /> Operador (8%)
+                    <User className="h-3.5 w-3.5 text-amber-400" /> Operador (25%)
                   </p>
                   <p className="font-mono font-semibold text-amber-300">{formatCurrency(operador)}</p>
                 </div>

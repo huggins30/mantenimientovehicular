@@ -14,6 +14,8 @@ import {
   Package,
   Shield,
   Hammer,
+  Banknote,
+  DollarSign,
 } from "lucide-react";
 import { getDashboardData, getGlobalDashboardData, getUnidadesUsuario } from "@/app/actions/dashboard";
 import { createSupabaseServerClient } from "@/lib/supabase";
@@ -37,13 +39,25 @@ import { Sidebar } from "@/components/dashboard/Sidebar";
 import { getComprasDolaresByUnidad } from "@/app/actions/dolares";
 import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares } from "@/lib/types";
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("es-PE", {
+function formatUSD(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "PEN",
+    currency: "USD",
     minimumFractionDigits: 2,
-  }).format(amount);
+  }).format(amount || 0);
 }
+
+function formatBs(amount: number): string {
+  return (
+    "Bs. " +
+    (amount || 0).toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
+const formatCurrency = formatUSD;
 
 // Next.js 15: searchParams is a Promise
 export default async function DashboardPage({
@@ -274,19 +288,31 @@ export default async function DashboardPage({
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Métricas Globales (Toda la Flota)
                   </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <FinancialSummaryCard
-                      title="Total Ingresos"
-                      amount={globalData.financialSummary.totalIngresos}
-                      icon={TrendingUp}
+                      title="Ingresos en Dólares"
+                      amount={globalData.financialSummary.totalIngresosDolares}
+                      icon={DollarSign}
                       variant="income"
-                      subtitle="Ingresos de todos los vehículos"
+                      currency="USD"
+                      badgeText="Dólares"
+                      subtitle="Divisas recaudadas ($)"
+                    />
+                    <FinancialSummaryCard
+                      title="Ingresos en Bolívares"
+                      amount={globalData.financialSummary.totalIngresosBolivares}
+                      icon={Banknote}
+                      variant="income"
+                      currency="BS"
+                      badgeText="Bolívares"
+                      subtitle="Pago móvil, efectivo y otros"
                     />
                     <FinancialSummaryCard
                       title="Gastos en Repuestos"
                       amount={globalData.financialSummary.totalGastosRepuestos}
                       icon={ShoppingCart}
                       variant="expense"
+                      currency="USD"
                       subtitle="Compras acumuladas"
                     />
                     <FinancialSummaryCard
@@ -294,6 +320,7 @@ export default async function DashboardPage({
                       amount={globalData.financialSummary.totalMantenimientoAceite}
                       icon={Wrench}
                       variant="maintenance"
+                      currency="USD"
                       subtitle="Servicios de todas las unidades"
                     />
                     <FinancialSummaryCard
@@ -301,51 +328,76 @@ export default async function DashboardPage({
                       amount={globalData.financialSummary.totalManoObra}
                       icon={Hammer}
                       variant="labor"
+                      currency="USD"
                       subtitle="Servicios mecánicos acumulados"
                     />
                     <FinancialSummaryCard
                       title="Rentabilidad Global"
-                      amount={globalData.financialSummary.rentabilidadNeta}
+                      amount={globalData.financialSummary.rentabilidadDolares}
                       icon={BarChart3}
                       variant="profit"
-                      subtitle="Ingresos − Gastos Totales"
+                      currency="USD"
+                      badgeText="Neto"
+                      secondaryAmount={{
+                        label: "En Bolívares",
+                        amount: globalData.financialSummary.rentabilidadBolivares,
+                        currency: "BS",
+                      }}
+                      subtitle="Balance de toda la flota"
                     />
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
-                    Desglose del Cálculo Global de Rentabilidad
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    Desglose del Cálculo Global de Rentabilidad (Dólares y Bolívares)
                   </h3>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {/* Fila Dólares */}
+                  <div className="flex flex-wrap items-center gap-2.5 text-sm">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 w-24">En Dólares:</span>
                     <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-emerald-300 font-mono font-semibold">
-                      {formatCurrency(globalData.financialSummary.totalIngresos)}
+                      {formatUSD(globalData.financialSummary.totalIngresosDolares)}
                     </div>
                     <span className="text-slate-500 font-bold">−</span>
-                    <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
-                      <span className="text-slate-400 font-mono">(</span>
-                      <span className="text-red-300 font-mono font-semibold" title="Repuestos">
-                        {formatCurrency(globalData.financialSummary.totalGastosRepuestos)}
+                    <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                      <span className="text-red-300 font-mono font-semibold" title="Repuestos y Mano de Obra ($)">
+                        {formatUSD(globalData.financialSummary.totalGastosRepuestos)}
                       </span>
-                      <span className="text-slate-400 font-mono">+</span>
-                      <span className="text-amber-300 font-mono font-semibold" title="Aceite">
-                        {formatCurrency(globalData.financialSummary.totalMantenimientoAceite)}
-                      </span>
-                      <span className="text-slate-400 font-mono">+</span>
-                      <span className="text-orange-300 font-mono font-semibold" title="Mano de Obra">
-                        {formatCurrency(globalData.financialSummary.totalManoObra)}
-                      </span>
-                      <span className="text-slate-400 font-mono">)</span>
                     </div>
                     <span className="text-slate-500 font-bold">=</span>
                     <div
-                      className={`rounded-xl px-4 py-2 font-mono font-bold text-lg ${
-                        globalData.financialSummary.rentabilidadNeta >= 0
-                          ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/20"
+                      className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
+                        globalData.financialSummary.rentabilidadDolares >= 0
+                          ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
                           : "bg-red-500/15 border border-red-500/30 text-red-300"
                       }`}
                     >
-                      {formatCurrency(globalData.financialSummary.rentabilidadNeta)}
+                      {formatUSD(globalData.financialSummary.rentabilidadDolares)}
+                    </div>
+                  </div>
+
+                  {/* Fila Bolívares */}
+                  <div className="flex flex-wrap items-center gap-2.5 text-sm">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 w-24">En Bolívares:</span>
+                    <div className="rounded-xl bg-cyan-500/15 border border-cyan-500/30 px-3 py-1.5 text-cyan-300 font-mono font-semibold">
+                      {formatBs(globalData.financialSummary.totalIngresosBolivares)}
+                    </div>
+                    <span className="text-slate-500 font-bold">−</span>
+                    <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                      <span className="text-red-300 font-mono font-semibold" title="Gastos en Bolívares">
+                        {formatBs(globalData.financialSummary.totalGastosRepuestosBs ?? 0)}
+                      </span>
+                    </div>
+                    <span className="text-slate-500 font-bold">=</span>
+                    <div
+                      className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
+                        globalData.financialSummary.rentabilidadBolivares >= 0
+                          ? "bg-cyan-500/15 border border-cyan-500/30 text-cyan-300"
+                          : "bg-red-500/15 border border-red-500/30 text-red-300"
+                      }`}
+                    >
+                      {globalData.financialSummary.rentabilidadBolivares >= 0 ? "+" : ""}
+                      {formatBs(globalData.financialSummary.rentabilidadBolivares)}
                     </div>
                   </div>
                 </section>
@@ -366,19 +418,31 @@ export default async function DashboardPage({
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Métricas Globales
                   </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <FinancialSummaryCard
-                      title="Total Ingresos"
-                      amount={financialSummary.totalIngresos}
-                      icon={TrendingUp}
+                      title="Ingresos en Dólares"
+                      amount={financialSummary.totalIngresosDolares}
+                      icon={DollarSign}
                       variant="income"
-                      subtitle="Fletes y pasajes registrados"
+                      currency="USD"
+                      badgeText="Dólares"
+                      subtitle="Fletes y pasajes en divisas ($)"
+                    />
+                    <FinancialSummaryCard
+                      title="Ingresos en Bolívares"
+                      amount={financialSummary.totalIngresosBolivares}
+                      icon={Banknote}
+                      variant="income"
+                      currency="BS"
+                      badgeText="Bolívares"
+                      subtitle="Pago móvil, efectivo y otros"
                     />
                     <FinancialSummaryCard
                       title="Gastos en Repuestos"
                       amount={financialSummary.totalGastosRepuestos}
                       icon={ShoppingCart}
                       variant="expense"
+                      currency="USD"
                       subtitle="Compras acumuladas"
                     />
                     <FinancialSummaryCard
@@ -386,6 +450,7 @@ export default async function DashboardPage({
                       amount={financialSummary.totalMantenimientoAceite}
                       icon={Wrench}
                       variant="maintenance"
+                      currency="USD"
                       subtitle="Cambios realizados"
                     />
                     <FinancialSummaryCard
@@ -393,52 +458,77 @@ export default async function DashboardPage({
                       amount={financialSummary.totalManoObra}
                       icon={Hammer}
                       variant="labor"
+                      currency="USD"
                       subtitle="Servicios mecánicos"
                     />
                     <FinancialSummaryCard
                       title="Rentabilidad Neta"
-                      amount={financialSummary.rentabilidadNeta}
+                      amount={financialSummary.rentabilidadDolares}
                       icon={BarChart3}
                       variant="profit"
-                      subtitle="Ingresos − Gastos Totales"
+                      currency="USD"
+                      badgeText="Neto"
+                      secondaryAmount={{
+                        label: "En Bolívares",
+                        amount: financialSummary.rentabilidadBolivares,
+                        currency: "BS",
+                      }}
+                      subtitle="Balance de esta unidad"
                     />
                   </div>
                 </section>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-                  <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">
-                      Desglose del Cálculo de Rentabilidad
+                  <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Desglose del Cálculo de Rentabilidad (Dólares y Bolívares)
                     </h3>
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                    {/* Fila Dólares */}
+                    <div className="flex flex-wrap items-center gap-2.5 text-sm">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400 w-24">En Dólares:</span>
                       <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-emerald-300 font-mono font-semibold">
-                        {formatCurrency(financialSummary.totalIngresos)}
+                        {formatUSD(financialSummary.totalIngresosDolares)}
                       </div>
                       <span className="text-slate-500 font-bold">−</span>
-                      <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
-                        <span className="text-slate-400 font-mono">(</span>
-                        <span className="text-red-300 font-mono font-semibold" title="Repuestos">
-                          {formatCurrency(financialSummary.totalGastosRepuestos)}
+                      <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                        <span className="text-red-300 font-mono font-semibold" title="Repuestos y Mano de Obra ($)">
+                          {formatUSD(financialSummary.totalGastosRepuestos)}
                         </span>
-                        <span className="text-slate-400 font-mono">+</span>
-                        <span className="text-amber-300 font-mono font-semibold" title="Aceite">
-                          {formatCurrency(financialSummary.totalMantenimientoAceite)}
-                        </span>
-                        <span className="text-slate-400 font-mono">+</span>
-                        <span className="text-orange-300 font-mono font-semibold" title="Mano de Obra">
-                          {formatCurrency(financialSummary.totalManoObra)}
-                        </span>
-                        <span className="text-slate-400 font-mono">)</span>
                       </div>
                       <span className="text-slate-500 font-bold">=</span>
                       <div
-                        className={`rounded-xl px-4 py-2 font-mono font-bold text-lg ${
-                          financialSummary.rentabilidadNeta >= 0
-                            ? "bg-violet-500/15 border border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/20"
+                        className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
+                          financialSummary.rentabilidadDolares >= 0
+                            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
                             : "bg-red-500/15 border border-red-500/30 text-red-300"
                         }`}
                       >
-                        {formatCurrency(financialSummary.rentabilidadNeta)}
+                        {formatUSD(financialSummary.rentabilidadDolares)}
+                      </div>
+                    </div>
+
+                    {/* Fila Bolívares */}
+                    <div className="flex flex-wrap items-center gap-2.5 text-sm">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400 w-24">En Bolívares:</span>
+                      <div className="rounded-xl bg-cyan-500/15 border border-cyan-500/30 px-3 py-1.5 text-cyan-300 font-mono font-semibold">
+                        {formatBs(financialSummary.totalIngresosBolivares)}
+                      </div>
+                      <span className="text-slate-500 font-bold">−</span>
+                      <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10">
+                        <span className="text-red-300 font-mono font-semibold" title="Gastos en Bolívares">
+                          {formatBs(financialSummary.totalGastosRepuestosBs ?? 0)}
+                        </span>
+                      </div>
+                      <span className="text-slate-500 font-bold">=</span>
+                      <div
+                        className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
+                          financialSummary.rentabilidadBolivares >= 0
+                            ? "bg-cyan-500/15 border border-cyan-500/30 text-cyan-300"
+                            : "bg-red-500/15 border border-red-500/30 text-red-300"
+                        }`}
+                      >
+                        {financialSummary.rentabilidadBolivares >= 0 ? "+" : ""}
+                        {formatBs(financialSummary.rentabilidadBolivares)}
                       </div>
                     </div>
                   </section>

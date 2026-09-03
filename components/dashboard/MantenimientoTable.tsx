@@ -24,12 +24,22 @@ interface MantenimientoTableProps {
   registros: RegistroMantenimiento[];
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("es-PE", {
+function formatUSD(amount: number) {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "PEN",
+    currency: "USD",
     minimumFractionDigits: 2,
-  }).format(amount);
+  }).format(amount || 0);
+}
+
+function formatBs(amount: number) {
+  return (
+    "Bs. " +
+    (amount || 0).toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 function formatDate(dateStr: string) {
@@ -48,6 +58,11 @@ function DetalleModal({
   registro: RegistroMantenimiento;
   onClose: () => void;
 }) {
+  const tasa = registro.tasa_cambio || 0;
+  const repBs = tasa > 0 ? registro.rep_subtotal * tasa : 0;
+  const moBs = tasa > 0 ? registro.mo_costo * tasa : 0;
+  const totalBs = registro.costo_bolivares || (tasa > 0 ? registro.costo_total * tasa : 0);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -104,9 +119,17 @@ function DetalleModal({
               <span className="text-slate-500">Cantidad</span>
               <span className="text-white font-medium text-right">{registro.rep_cantidad}</span>
               <span className="text-slate-500">Costo unitario</span>
-              <span className="text-white font-medium text-right">{formatCurrency(registro.rep_costo_unitario)}</span>
-              <span className="text-slate-500 font-semibold">Subtotal</span>
-              <span className="text-amber-300 font-bold text-right">{formatCurrency(registro.rep_subtotal)}</span>
+              <span className="text-white font-medium text-right">{formatUSD(registro.rep_costo_unitario)}</span>
+              <span className="text-slate-500 font-semibold">Subtotal ($)</span>
+              <span className="text-amber-300 font-bold text-right">{formatUSD(registro.rep_subtotal)}</span>
+              {repBs > 0 && (
+                <>
+                  <span className="text-amber-400/80 font-semibold">Monto en Bs</span>
+                  <span className="text-amber-200 font-bold font-mono text-right">
+                    {formatBs(repBs)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -118,22 +141,42 @@ function DetalleModal({
             <div className="grid grid-cols-2 gap-y-1 text-xs">
               <span className="text-slate-500">Concepto</span>
               <span className="text-white font-medium text-right">{registro.mo_concepto}</span>
-              <span className="text-slate-500 font-semibold">Costo</span>
-              <span className="text-orange-300 font-bold text-right">{formatCurrency(registro.mo_costo)}</span>
+              <span className="text-slate-500 font-semibold">Costo ($)</span>
+              <span className="text-orange-300 font-bold text-right">{formatUSD(registro.mo_costo)}</span>
+              {moBs > 0 && (
+                <>
+                  <span className="text-orange-400/80 font-semibold">Monto en Bs</span>
+                  <span className="text-orange-200 font-bold font-mono text-right">
+                    {formatBs(moBs)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Total */}
-          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-violet-400/80">
-              <Calculator className="h-3.5 w-3.5" />
-              <span>
-                {formatCurrency(registro.rep_subtotal)} + {formatCurrency(registro.mo_costo)}
+          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-violet-400/80">
+                <Calculator className="h-3.5 w-3.5" />
+                <span>
+                  {formatUSD(registro.rep_subtotal)} + {formatUSD(registro.mo_costo)}
+                </span>
+              </div>
+              <span className="font-mono text-base font-bold text-violet-300">
+                {formatUSD(registro.costo_total)}
               </span>
             </div>
-            <span className="font-mono text-base font-bold text-violet-300">
-              {formatCurrency(registro.costo_total)}
-            </span>
+            {totalBs > 0 && (
+              <div className="flex items-center justify-between border-t border-violet-500/20 pt-2">
+                <span className="text-xs text-cyan-400/80">
+                  Total en Bs {tasa > 0 ? `(× ${tasa.toFixed(2)})` : ""}
+                </span>
+                <span className="font-mono text-sm font-bold text-cyan-300">
+                  {formatBs(totalBs)}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Notas */}
@@ -220,56 +263,68 @@ export function MantenimientoTable({ registros }: MantenimientoTableProps) {
             No se encontraron resultados para "{searchQuery}".
           </p>
         ) : (
-          filteredRegistros.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.07]"
-            >
-              {/* Fecha */}
-              <div className="flex items-center gap-1.5 shrink-0 text-xs text-slate-500 min-w-[90px]">
-                <CalendarDays className="h-3.5 w-3.5" />
-                {formatDate(r.fecha)}
-              </div>
+          filteredRegistros.map((r) => {
+            const tasa = r.tasa_cambio || 0;
+            const totalBs = r.costo_bolivares || (tasa > 0 ? r.costo_total * tasa : 0);
 
-              {/* Tags */}
-              <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
-                <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 rounded-md px-2 py-0.5 truncate max-w-[130px]">
-                  <Package className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{r.rep_concepto}</span>
-                </span>
-                <span className="flex items-center gap-1 text-xs text-orange-400 bg-orange-500/10 rounded-md px-2 py-0.5 truncate max-w-[130px]">
-                  <Hammer className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{r.mo_concepto}</span>
-                </span>
-              </div>
+            return (
+              <div
+                key={r.id}
+                className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.07]"
+              >
+                {/* Fecha */}
+                <div className="flex items-center gap-1.5 shrink-0 text-xs text-slate-500 min-w-[90px]">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {formatDate(r.fecha)}
+                </div>
 
-              {/* Total */}
-              <span className="font-mono font-bold text-violet-300 text-sm shrink-0">
-                {formatCurrency(r.costo_total)}
-              </span>
+                {/* Tags */}
+                <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+                  <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 rounded-md px-2 py-0.5 truncate max-w-[130px]">
+                    <Package className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{r.rep_concepto}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-orange-400 bg-orange-500/10 rounded-md px-2 py-0.5 truncate max-w-[130px]">
+                    <Hammer className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{r.mo_concepto}</span>
+                  </span>
+                </div>
 
-              {/* Acciones */}
-              <div className="flex items-center gap-1 shrink-0">
-                {/* Ojo — abre modal */}
-                <button
-                  onClick={() => setSelectedRegistro(r)}
-                  title="Ver detalle"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                {/* Eliminar */}
-                <button
-                  onClick={() => handleDelete(r.id)}
-                  disabled={deletingId === r.id}
-                  title="Eliminar"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {/* Total */}
+                <div className="text-right shrink-0">
+                  <span className="font-mono font-bold text-violet-300 text-sm block">
+                    {formatUSD(r.costo_total)}
+                  </span>
+                  {totalBs > 0 && (
+                    <span className="font-mono text-[11px] text-cyan-400 block">
+                      {formatBs(totalBs)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Acciones */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Ojo — abre modal */}
+                  <button
+                    onClick={() => setSelectedRegistro(r)}
+                    title="Ver detalle"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                  {/* Eliminar */}
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    disabled={deletingId === r.id}
+                    title="Eliminar"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </>

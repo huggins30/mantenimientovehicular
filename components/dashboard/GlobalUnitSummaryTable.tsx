@@ -6,19 +6,40 @@
 // ============================================================
 
 import { useState } from "react";
-import { Car, TrendingUp, TrendingDown, BarChart2, X, DollarSign, Wrench, ShoppingCart, Hammer } from "lucide-react";
+import {
+  Car,
+  TrendingUp,
+  TrendingDown,
+  BarChart2,
+  X,
+  DollarSign,
+  Wrench,
+  ShoppingCart,
+  Hammer,
+  Banknote,
+} from "lucide-react";
 import type { ResumenPorUnidad } from "@/app/actions/dashboard";
 
 interface GlobalUnitSummaryTableProps {
   resumen: ResumenPorUnidad[];
 }
 
-function formatCurrency(val: number) {
-  return new Intl.NumberFormat("es-PE", {
+function formatUSD(val: number) {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "PEN",
+    currency: "USD",
     minimumFractionDigits: 2,
-  }).format(val);
+  }).format(val || 0);
+}
+
+function formatBs(val: number) {
+  return (
+    "Bs. " +
+    (val || 0).toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 // ── Modal de Reporte ─────────────────────────────────────────
@@ -35,65 +56,74 @@ function ReporteModal({
 
   const items = [
     {
-      label: "Ingresos",
-      value: row.totalIngresos,
+      label: "Ingresos en Dólares ($)",
+      valueText: formatUSD(row.totalIngresosDolares ?? 0),
       color: "emerald",
-      icon: TrendingUp,
-      bar: row.totalIngresos,
+      icon: DollarSign,
+      bar: row.totalIngresosDolares ?? 0,
+    },
+    {
+      label: "Ingresos en Bolívares (Bs)",
+      valueText: formatBs(row.totalIngresosBolivares ?? 0),
+      color: "cyan",
+      icon: Banknote,
+      bar: row.totalIngresosBolivares ?? 0,
     },
     {
       label: "Mantenimiento (Rep + Mano Obra)",
-      value: row.totalGastosRepuestos,
+      valueText: formatUSD(row.totalGastosRepuestos),
       color: "red",
       icon: ShoppingCart,
       bar: row.totalGastosRepuestos,
     },
     {
       label: "Cambios de Aceite",
-      value: row.totalMantenimientoAceite,
+      valueText: formatUSD(row.totalMantenimientoAceite),
       color: "amber",
       icon: Wrench,
       bar: row.totalMantenimientoAceite,
     },
     {
       label: "Mano de Obra adicional",
-      value: row.totalManoObra,
+      valueText: formatUSD(row.totalManoObra),
       color: "orange",
       icon: Hammer,
       bar: row.totalManoObra,
     },
   ];
 
-  const maxBar = Math.max(row.totalIngresos, totalGastos, 1);
+  const maxBar = Math.max(
+    row.totalIngresosDolares ?? 0,
+    totalGastos,
+    1
+  );
 
   const colorMap: Record<string, string> = {
     emerald: "bg-emerald-500",
+    cyan: "bg-cyan-500",
     red: "bg-red-500",
     amber: "bg-amber-500",
     orange: "bg-orange-500",
   };
   const textMap: Record<string, string> = {
     emerald: "text-emerald-300",
+    cyan: "text-cyan-300",
     red: "text-red-300",
     amber: "text-amber-300",
     orange: "text-orange-300",
   };
 
   return (
-    /* Overlay */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      {/* Fondo oscuro blur */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-      {/* Panel del modal */}
       <div
         className="relative z-10 w-full max-w-lg rounded-3xl border border-white/10 bg-[#0e0e1a] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Glow */}
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-violet-600/20 blur-3xl pointer-events-none" />
 
         {/* Header */}
@@ -125,7 +155,7 @@ function ReporteModal({
           <div className="space-y-3">
             {items.map((item) => {
               const Icon = item.icon;
-              const pct = Math.round((item.bar / maxBar) * 100);
+              const pct = Math.min(100, Math.round((item.bar / maxBar) * 100));
               return (
                 <div key={item.label} className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -134,13 +164,13 @@ function ReporteModal({
                       {item.label}
                     </div>
                     <span className={`font-mono text-sm font-bold ${textMap[item.color]}`}>
-                      {formatCurrency(item.value)}
+                      {item.valueText}
                     </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ${colorMap[item.color]}`}
-                      style={{ width: `${pct}%` }}
+                      style={{ width: `${Math.max(pct, 5)}%` }}
                     />
                   </div>
                 </div>
@@ -148,51 +178,64 @@ function ReporteModal({
             })}
           </div>
 
-          {/* Divisor */}
           <div className="h-px bg-white/10" />
 
           {/* Totales */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-center">
-              <p className="text-xs text-slate-500 mb-1">Total Gastos</p>
-              <p className="font-mono text-lg font-bold text-red-300">
-                {formatCurrency(totalGastos)}
+              <p className="text-xs text-slate-500 mb-1">Total Gastos ($)</p>
+              <p className="font-mono text-base font-bold text-red-300">
+                {formatUSD(totalGastos)}
               </p>
             </div>
-            <div className={`rounded-xl border p-3 text-center ${
-              isPositive
-                ? "border-emerald-500/20 bg-emerald-500/5"
-                : "border-red-500/20 bg-red-500/5"
-            }`}>
-              <p className="text-xs text-slate-500 mb-1">Rentabilidad Neta</p>
-              <div className={`flex items-center justify-center gap-1.5 font-mono text-lg font-bold ${
-                isPositive ? "text-emerald-300" : "text-red-300"
-              }`}>
-                {isPositive
-                  ? <TrendingUp className="h-4 w-4" />
-                  : <TrendingDown className="h-4 w-4" />
-                }
-                {formatCurrency(row.rentabilidadNeta)}
+            <div
+              className={`rounded-xl border p-3 text-center ${
+                (row.rentabilidadDolares ?? 0) >= 0
+                  ? "border-emerald-500/20 bg-emerald-500/5"
+                  : "border-red-500/20 bg-red-500/5"
+              }`}
+            >
+              <p className="text-xs text-slate-500 mb-1">Rentabilidad USD ($)</p>
+              <div
+                className={`flex items-center justify-center gap-1 font-mono text-base font-bold ${
+                  (row.rentabilidadDolares ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"
+                }`}
+              >
+                {(row.rentabilidadDolares ?? 0) >= 0 ? (
+                  <TrendingUp className="h-3.5 w-3.5" />
+                ) : (
+                  <TrendingDown className="h-3.5 w-3.5" />
+                )}
+                {formatUSD(row.rentabilidadDolares ?? 0)}
               </div>
             </div>
           </div>
 
-          {/* Fórmula */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wider">Cálculo</p>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <span className="text-emerald-300 font-bold">{formatCurrency(row.totalIngresos)}</span>
-              <span className="text-slate-500">−</span>
-              <span className="text-slate-400">(</span>
-              <span className="text-red-300">{formatCurrency(row.totalGastosRepuestos)}</span>
-              <span className="text-slate-500">+</span>
-              <span className="text-amber-300">{formatCurrency(row.totalMantenimientoAceite)}</span>
-              <span className="text-slate-500">+</span>
-              <span className="text-orange-300">{formatCurrency(row.totalManoObra)}</span>
-              <span className="text-slate-400">)</span>
-              <span className="text-slate-500">=</span>
-              <span className={`font-bold text-base ${isPositive ? "text-violet-300" : "text-red-300"}`}>
-                {formatCurrency(row.rentabilidadNeta)}
+          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-center">
+            <p className="text-[11px] text-slate-400 mb-0.5">Rentabilidad Neta en Bolívares (Bs)</p>
+            <p className={`font-mono text-base font-bold ${
+              (row.rentabilidadBolivares ?? 0) >= 0 ? "text-cyan-300" : "text-red-300"
+            }`}>
+              {(row.rentabilidadBolivares ?? 0) >= 0 ? "+" : ""}
+              {formatBs(row.rentabilidadBolivares ?? 0)}
+            </p>
+          </div>
+
+          {/* Resumen Ingresos $ y Bs */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-2">
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+              Desglose de Ingresos Recaudados
+            </p>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Total en Dólares ($):</span>
+              <span className="font-mono font-bold text-emerald-300">
+                {formatUSD(row.totalIngresosDolares ?? 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Total en Bolívares (Bs):</span>
+              <span className="font-mono font-bold text-cyan-300">
+                {formatBs(row.totalIngresosBolivares ?? 0)}
               </span>
             </div>
           </div>
@@ -224,6 +267,9 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
     );
   }
 
+  const totalDolares = resumen.reduce((s, r) => s + (r.totalIngresosDolares ?? 0), 0);
+  const totalBolivares = resumen.reduce((s, r) => s + (r.totalIngresosBolivares ?? 0), 0);
+
   return (
     <>
       {/* Modal */}
@@ -237,17 +283,17 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
             <thead className="bg-black/20 text-xs font-semibold uppercase tracking-widest text-slate-500">
               <tr>
                 <th className="px-5 py-4">Unidad</th>
-                <th className="px-5 py-4 text-right text-emerald-400/80">Ingresos</th>
+                <th className="px-5 py-4 text-right text-emerald-400/80">Ingresos ($ / Bs)</th>
                 <th className="px-5 py-4 text-right text-red-400/80">Repuestos</th>
                 <th className="px-5 py-4 text-right text-amber-400/80">Aceite</th>
                 <th className="px-5 py-4 text-right text-orange-400/80">Mano Obra</th>
-                <th className="px-5 py-4 text-right text-violet-400/80">Rentabilidad</th>
+                <th className="px-5 py-4 text-right text-violet-400/80">Rentabilidad ($ / Bs)</th>
                 <th className="px-5 py-4 text-center text-slate-500">Reporte</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {resumen.map((row) => {
-                const isPositive = row.rentabilidadNeta >= 0;
+                const isPositiveUSD = (row.rentabilidadDolares ?? 0) >= 0;
                 return (
                   <tr key={row.unidad_id} className="transition-colors hover:bg-white/5">
                     <td className="px-5 py-4">
@@ -261,29 +307,51 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-right font-mono text-emerald-400 font-medium whitespace-nowrap">
-                      {formatCurrency(row.totalIngresos)}
+
+                    {/* Ingresos en Dólares y en Bolívares */}
+                    <td className="px-5 py-4 text-right font-mono whitespace-nowrap">
+                      <span className="block text-emerald-300 font-bold text-sm">
+                        {formatUSD(row.totalIngresosDolares ?? 0)}
+                      </span>
+                      <span className="block text-cyan-300 font-medium text-xs mt-0.5">
+                        {formatBs(row.totalIngresosBolivares ?? 0)}
+                      </span>
                     </td>
+
                     <td className="px-5 py-4 text-right font-mono text-red-400 font-medium whitespace-nowrap">
-                      {formatCurrency(row.totalGastosRepuestos)}
+                      {formatUSD(row.totalGastosRepuestos)}
                     </td>
                     <td className="px-5 py-4 text-right font-mono text-amber-400 font-medium whitespace-nowrap">
-                      {formatCurrency(row.totalMantenimientoAceite)}
+                      {formatUSD(row.totalMantenimientoAceite)}
                     </td>
                     <td className="px-5 py-4 text-right font-mono text-orange-400 font-medium whitespace-nowrap">
-                      {formatCurrency(row.totalManoObra)}
+                      {formatUSD(row.totalManoObra)}
                     </td>
+                    {/* Rentabilidad en Dólares y en Bolívares */}
                     <td className="px-5 py-4 text-right whitespace-nowrap">
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono font-bold text-sm ${
-                        isPositive
-                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                          : "bg-red-500/15 text-red-300 border border-red-500/30"
-                      }`}>
-                        {isPositive
-                          ? <TrendingUp className="h-3.5 w-3.5" />
-                          : <TrendingDown className="h-3.5 w-3.5" />
-                        }
-                        {formatCurrency(row.rentabilidadNeta)}
+                      <div className="flex flex-col items-end gap-1">
+                        <div
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono font-bold text-xs ${
+                            isPositiveUSD
+                              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                              : "bg-red-500/15 text-red-300 border border-red-500/30"
+                          }`}
+                        >
+                          {isPositiveUSD ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {formatUSD(row.rentabilidadDolares ?? 0)}
+                        </div>
+                        <span
+                          className={`font-mono text-xs font-semibold ${
+                            (row.rentabilidadBolivares ?? 0) >= 0 ? "text-cyan-300" : "text-red-300"
+                          }`}
+                        >
+                          {(row.rentabilidadBolivares ?? 0) >= 0 ? "+" : ""}
+                          {formatBs(row.rentabilidadBolivares ?? 0)}
+                        </span>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-center">
@@ -307,31 +375,56 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                 <td className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">
                   Total Flota
                 </td>
-                <td className="px-5 py-4 text-right font-mono font-bold text-emerald-300 text-sm whitespace-nowrap">
-                  {formatCurrency(resumen.reduce((s, r) => s + r.totalIngresos, 0))}
+
+                {/* Totales de Ingresos en Dólares y en Bolívares */}
+                <td className="px-5 py-4 text-right font-mono whitespace-nowrap">
+                  <span className="block font-bold text-emerald-300 text-sm">
+                    {formatUSD(totalDolares)}
+                  </span>
+                  <span className="block font-bold text-cyan-300 text-xs mt-0.5">
+                    {formatBs(totalBolivares)}
+                  </span>
                 </td>
+
                 <td className="px-5 py-4 text-right font-mono font-bold text-red-300 text-sm whitespace-nowrap">
-                  {formatCurrency(resumen.reduce((s, r) => s + r.totalGastosRepuestos, 0))}
+                  {formatUSD(resumen.reduce((s, r) => s + r.totalGastosRepuestos, 0))}
                 </td>
                 <td className="px-5 py-4 text-right font-mono font-bold text-amber-300 text-sm whitespace-nowrap">
-                  {formatCurrency(resumen.reduce((s, r) => s + r.totalMantenimientoAceite, 0))}
+                  {formatUSD(resumen.reduce((s, r) => s + r.totalMantenimientoAceite, 0))}
                 </td>
                 <td className="px-5 py-4 text-right font-mono font-bold text-orange-300 text-sm whitespace-nowrap">
-                  {formatCurrency(resumen.reduce((s, r) => s + r.totalManoObra, 0))}
+                  {formatUSD(resumen.reduce((s, r) => s + r.totalManoObra, 0))}
                 </td>
+                {/* Total Rentabilidad Flota en Dólares y en Bolívares */}
                 <td className="px-5 py-4 text-right whitespace-nowrap">
-                  {(() => {
-                    const total = resumen.reduce((s, r) => s + r.rentabilidadNeta, 0);
-                    return (
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono font-bold text-sm ${
-                        total >= 0
-                          ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                          : "bg-red-500/15 text-red-300 border border-red-500/30"
-                      }`}>
-                        {formatCurrency(total)}
-                      </div>
-                    );
-                  })()}
+                  <div className="flex flex-col items-end gap-1">
+                    {(() => {
+                      const totDolares = resumen.reduce((s, r) => s + (r.rentabilidadDolares ?? 0), 0);
+                      const totBs = resumen.reduce((s, r) => s + (r.rentabilidadBolivares ?? 0), 0);
+                      return (
+                        <>
+                          <div
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono font-bold text-xs ${
+                              totDolares >= 0
+                                ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                                : "bg-red-500/15 text-red-300 border border-red-500/30"
+                            }`}
+                          >
+                            {totDolares >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {formatUSD(totDolares)}
+                          </div>
+                          <span
+                            className={`font-mono text-xs font-bold ${
+                              totBs >= 0 ? "text-cyan-300" : "text-red-300"
+                            }`}
+                          >
+                            {totBs >= 0 ? "+" : ""}
+                            {formatBs(totBs)}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </td>
                 <td className="px-5 py-4" />
               </tr>

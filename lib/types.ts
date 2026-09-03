@@ -96,6 +96,8 @@ export interface RegistroMantenimiento {
   mo_costo: number;
   // Total calculado por DB: rep_subtotal + mo_costo
   costo_total: number;
+  costo_bolivares?: number;
+  tasa_cambio?: number;
   proveedor?: string;
   notas?: string;
   created_at?: string;
@@ -167,10 +169,18 @@ export interface OilChangeStatusData {
 /** Resumen financiero consolidado del dashboard */
 export interface FinancialSummary {
   totalIngresos: number;
+  totalIngresosDolares: number;
+  totalIngresosBolivares: number;
   totalGastosRepuestos: number;
+  totalGastosRepuestosBs?: number;
   totalMantenimientoAceite: number;
+  totalMantenimientoAceiteBs?: number;
   totalManoObra: number;
-  /** Fórmula: totalIngresos - (totalGastosRepuestos + totalMantenimientoAceite + totalManoObra) */
+  /** Rentabilidad en Dólares ($) = Ingresos USD - Gastos USD */
+  rentabilidadDolares: number;
+  /** Rentabilidad en Bolívares (Bs) = Ingresos Bs - Gastos Bs */
+  rentabilidadBolivares: number;
+  /** Rentabilidad en USD */
   rentabilidadNeta: number;
 }
 
