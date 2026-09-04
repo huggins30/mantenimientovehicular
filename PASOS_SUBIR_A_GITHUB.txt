@@ -1,0 +1,81 @@
+========================================================================
+             PASOS PARA SUBIR LOS CAMBIOS A GITHUB
+========================================================================
+
+Repositorio configurado:
+https://github.com/huggins30/mantenimientovehicular.git
+Rama principal: main
+
+------------------------------------------------------------------------
+PASO 1: Abrir la terminal
+------------------------------------------------------------------------
+Abre una terminal (PowerShell o CMD) dentro de la carpeta del proyecto:
+C:\Users\ricardoh\Desktop\mantenimientovehicular
+
+
+------------------------------------------------------------------------
+PASO 2: Verificar el estado de los archivos modificados
+------------------------------------------------------------------------
+Ejecuta el siguiente comando para ver qué archivos cambiaron:
+
+git status
+
+(Verás en color rojo los archivos modificados en app/, components/, lib/, etc.)
+
+
+------------------------------------------------------------------------
+PASO 3: Agregar todos los cambios al área de preparación (Stage)
+------------------------------------------------------------------------
+Ejecuta:
+
+git add .
+
+
+------------------------------------------------------------------------
+PASO 4: Guardar los cambios con un mensaje de commit
+------------------------------------------------------------------------
+Ejecuta:
+
+git commit -m "Ajuste en calculos de ingresos, conversion de divisas y compra de dolares global"
+
+
+------------------------------------------------------------------------
+PASO 5: Subir los cambios a GitHub
+------------------------------------------------------------------------
+Ejecuta:
+
+git push origin main
+
+
+------------------------------------------------------------------------
+PASO 6: Verificar que todo se subió correctamente
+------------------------------------------------------------------------
+Ejecuta:
+
+git status
+
+Deberías ver el mensaje:
+"nothing to commit, working tree clean"
+y tu repositorio en GitHub ya estará 100% actualizado.
+
+
+========================================================================
+                      SOLUCIÓN A CASOS ESPECIALES
+========================================================================
+
+CASO A: Si GitHub te pide usuario y contraseña al hacer "git push"
+- Usuario: huggins30
+- Contraseña: No es tu contraseña normal de GitHub; debes usar un
+  "Personal Access Token" (PAT).
+  Para crearlo:
+  1. En GitHub ve a: Settings > Developer settings > Personal access tokens > Tokens (classic)
+  2. Clic en "Generate new token (classic)"
+  3. Marca la casilla "repo" y dale a "Generate token"
+  4. Copia ese código y pégalo cuando la terminal te pida Password.
+
+CASO B: Si te sale un error de que hay cambios remotos pendientes (rejected / fetch first)
+Ejecuta primero:
+git pull --rebase origin main
+y luego repite:
+git push origin main
+========================================================================

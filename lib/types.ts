@@ -144,6 +144,12 @@ export interface ComprasDolares {
   costo_bolivares: number;  // Calculado: cantidad_dolares * tasa_cambio
   notas?: string;
   created_at?: string;
+  unidades?: {
+    placa: string;
+    numero_unidad: string | null;
+    marca?: string;
+    modelo?: string;
+  } | null;
 }
 
 // -------------------------------------------------------

@@ -59,14 +59,27 @@ function DetalleIngresoModal({
   onClose: () => void;
 }) {
   const paymentRows = [
-    { label: "Pago Móvil", value: ingreso.pago_movil ?? 0, icon: Smartphone,     color: "text-violet-300",  bg: "bg-violet-500/10",  border: "border-violet-500/20" },
-    { label: "Movi",       value: ingreso.movi      ?? 0, icon: Zap,             color: "text-blue-300",    bg: "bg-blue-500/10",    border: "border-blue-500/20"   },
-    { label: "Dólares",    value: ingreso.dolares   ?? 0, icon: DollarSign,      color: "text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/20"},
-    { label: "Efectivo",   value: ingreso.efectivo  ?? 0, icon: Banknote,        color: "text-teal-300",    bg: "bg-teal-500/10",    border: "border-teal-500/20"   },
-    { label: "Otros",      value: ingreso.otros     ?? 0, icon: MoreHorizontal,  color: "text-slate-300",   bg: "bg-slate-500/10",   border: "border-slate-500/20"  },
+    { label: "Pago Móvil", value: ingreso.pago_movil ?? 0, icon: Smartphone,     color: "text-violet-300",  bg: "bg-violet-500/10",  border: "border-violet-500/20", isUSD: false },
+    { label: "Movi",       value: ingreso.movi      ?? 0, icon: Zap,             color: "text-blue-300",    bg: "bg-blue-500/10",    border: "border-blue-500/20",   isUSD: false },
+    { label: "Dólares",    value: ingreso.dolares   ?? 0, icon: DollarSign,      color: "text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/20",  isUSD: true  },
+    { label: "Efectivo",   value: ingreso.efectivo  ?? 0, icon: Banknote,        color: "text-teal-300",    bg: "bg-teal-500/10",    border: "border-teal-500/20",   isUSD: false },
+    { label: "Otros",      value: ingreso.otros     ?? 0, icon: MoreHorizontal,  color: "text-slate-300",   bg: "bg-slate-500/10",   border: "border-slate-500/20",  isUSD: false },
   ];
 
-  const total = ingreso.monto_ingreso ?? 0;
+  // Monto neto registrado
+  const montoNeto = ingreso.monto_ingreso ?? 0;
+
+  // Total recaudado bruto calculado a partir del neto (montoNeto = totalRecaudado * 0.7675)
+  const totalRecaudado = montoNeto > 0
+    ? (montoNeto / 0.7675)
+    : ((ingreso.pago_movil ?? 0) + (ingreso.movi ?? 0) + (ingreso.efectivo ?? 0) + (ingreso.otros ?? 0));
+
+  // Deducciones según la fórmula actual
+  const ahorroUnidad = totalRecaudado * 0.25;
+  const colector = (totalRecaudado - ahorroUnidad) * 0.08;
+  const operador = (totalRecaudado - ahorroUnidad - colector) * 0.25;
+  const ingresoRegistrado = montoNeto || (totalRecaudado - colector - operador);
+
   const maxVal = Math.max(...paymentRows.map((r) => r.value), 1);
 
   return (
@@ -124,7 +137,7 @@ function DetalleIngresoModal({
                     {row.label}
                   </div>
                   <span className={`font-mono text-sm font-bold ${row.value > 0 ? row.color : "text-slate-600"}`}>
-                    {formatCurrency(row.value)}
+                    {row.isUSD ? `$ ${row.value.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD` : formatCurrency(row.value)}
                   </span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
@@ -137,38 +150,62 @@ function DetalleIngresoModal({
             );
           })}
 
-          {/* Total */}
+          {/* Total Recaudado */}
           <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3">
-            <div className="flex items-center gap-2 text-xs text-emerald-400/80">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
               <Calculator className="h-3.5 w-3.5" />
-              Total del ingreso
+              Total Recaudado
             </div>
             <span className="font-mono text-base font-bold text-emerald-300">
-              {formatCurrency(total)}
+              {formatCurrency(totalRecaudado)}
             </span>
           </div>
 
           {/* Deducciones calculadas */}
-          {(ingreso.ahorro_unidad !== undefined || ingreso.colector !== undefined) && (
-            <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
-                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                  <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro (25%)
-                </p>
-                <p className="font-mono font-semibold text-blue-300 text-sm">
-                  {formatCurrency(ingreso.ahorro_unidad ?? (total * 0.25))}
-                </p>
-              </div>
-              <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
-                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                  <User className="h-3.5 w-3.5 text-orange-400" /> Colector (8%)
-                </p>
-                <p className="font-mono font-semibold text-orange-300 text-sm">
-                  {formatCurrency(ingreso.colector ?? ((total * 0.75) * 0.08))}
-                </p>
-              </div>
+          <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro Unidad (25%)
+              </p>
+              <p className="font-mono font-semibold text-blue-300 text-sm">
+                {formatCurrency(ahorroUnidad)}
+              </p>
             </div>
-          )}
+            <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
+              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                <User className="h-3.5 w-3.5 text-orange-400" /> Colector (8%)
+              </p>
+              <p className="font-mono font-semibold text-orange-300 text-sm">
+                {formatCurrency(colector)}
+              </p>
+              {ingreso.nombre_colector && (
+                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                  {ingreso.nombre_colector}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                <User className="h-3.5 w-3.5 text-amber-400" /> Operador (25%)
+              </p>
+              <p className="font-mono font-semibold text-amber-300 text-sm">
+                {formatCurrency(operador)}
+              </p>
+              {ingreso.nombre_operador && (
+                <p className="text-[10px] text-slate-500 mt-1 truncate">
+                  {ingreso.nombre_operador}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <p className="flex items-center gap-1.5 text-emerald-400 mb-1">
+                <Banknote className="h-3.5 w-3.5 text-emerald-400" /> Ingreso Registrado
+              </p>
+              <p className="font-mono font-semibold text-emerald-300 text-sm">
+                {formatCurrency(ingresoRegistrado)}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

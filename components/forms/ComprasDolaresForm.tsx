@@ -20,10 +20,12 @@ import {
   ArrowRightLeft,
   Calculator,
   Banknote,
+  Car,
 } from "lucide-react";
 
 interface ComprasDolaresFormProps {
-  unidad: Unidad;
+  unidad?: Unidad;
+  unidades?: Unidad[];
 }
 
 const initialState: ActionResult<ComprasDolares> = { success: false };
@@ -36,7 +38,7 @@ function formatCurrency(val: number, currency = "PEN", locale = "es-PE") {
   }).format(val);
 }
 
-export function ComprasDolaresForm({ unidad }: ComprasDolaresFormProps) {
+export function ComprasDolaresForm({ unidad, unidades }: ComprasDolaresFormProps) {
   const [state, action, isPending] = useActionState(
     registrarCompraDolaresAction,
     initialState
@@ -69,7 +71,9 @@ export function ComprasDolaresForm({ unidad }: ComprasDolaresFormProps) {
         <div>
           <h3 className="text-sm font-semibold text-white">Registrar Compra de Dólares</h3>
           <p className="text-xs text-slate-500">
-            {unidad.numero_unidad || unidad.placa} — {unidad.marca} {unidad.modelo}
+            {unidad
+              ? `${unidad.numero_unidad || unidad.placa} — ${unidad.marca} ${unidad.modelo}`
+              : "Control global de divisas para todas las unidades"}
           </p>
         </div>
       </div>
@@ -89,7 +93,11 @@ export function ComprasDolaresForm({ unidad }: ComprasDolaresFormProps) {
       )}
 
       <form action={action} className="space-y-4">
-        <input type="hidden" name="unidad_id" value={unidad.id} />
+        <input
+          type="hidden"
+          name="unidad_id"
+          value={unidad?.id || (unidades && unidades[0]?.id) || ""}
+        />
 
         {/* Fecha */}
         <div className="space-y-1.5">

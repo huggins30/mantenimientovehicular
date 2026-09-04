@@ -59,12 +59,6 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       icon: Package,
       description: "Repuestos y mano de obra",
     },
-    {
-      id: "dolares",
-      label: "Compra de Dólares",
-      icon: DollarSign,
-      description: "Registro de divisas",
-    },
   ];
 
   return (
@@ -147,6 +141,43 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
                   }`}
                 >
                   Resumen General
+                </p>
+                <p className="text-xs text-slate-500">Todas las unidades</p>
+              </div>
+            </Link>
+
+            {/* Compra de Dólares (Global / Todas las unidades) */}
+            <Link
+              href={`/?tab=dolares`}
+              onClick={() => setIsOpen(false)}
+              className={`
+                group flex items-center gap-4 rounded-xl px-4 py-3 transition-all duration-200 mb-2
+                ${
+                  activeTab === "dolares"
+                    ? "bg-yellow-500/15 ring-1 ring-yellow-500/30"
+                    : "hover:bg-white/5"
+                }
+              `}
+            >
+              <div
+                className={`
+                  flex h-10 w-10 items-center justify-center rounded-lg transition-colors
+                  ${
+                    activeTab === "dolares"
+                      ? "bg-yellow-500 text-slate-900 shadow-lg shadow-yellow-500/20 font-bold"
+                      : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
+                  }
+                `}
+              >
+                <DollarSign className="h-5 w-5" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    activeTab === "dolares" ? "text-yellow-300 font-bold" : "text-slate-300"
+                  }`}
+                >
+                  Compra de Dólares
                 </p>
                 <p className="text-xs text-slate-500">Todas las unidades</p>
               </div>

@@ -32,6 +32,8 @@ export async function registrarIngresoAction(
   const pagoMovil = Number(formData.get("pago_movil"))  || 0;
   const movi      = Number(formData.get("movi"))        || 0;
   const dolares   = Number(formData.get("dolares"))     || 0;
+  const montoBsDolar = Number(formData.get("monto_bs_dolar")) || 0;
+  const totalConversion = Number(formData.get("total_conversion")) || (dolares * montoBsDolar);
   const efectivo  = Number(formData.get("efectivo"))    || 0;
   const otros     = Number(formData.get("otros"))       || 0;
 
@@ -39,12 +41,12 @@ export async function registrarIngresoAction(
   const nombreColector = String(formData.get("nombre_colector") ?? "").trim();
   const kilometrajeActual = Number(formData.get("kilometraje_actual")) || null;
 
-  // El total es la suma de todas las formas de pago
-  const totalRecaudado = pagoMovil + movi + dolares + efectivo + otros;
+  // El total es la suma de los pagos en Bs más la conversión de dólares a Bs
+  const totalRecaudado = pagoMovil + movi + efectivo + otros + totalConversion;
   const ahorroUnidad = totalRecaudado * 0.25;
   const colector = (totalRecaudado - ahorroUnidad) * 0.08;
-  const operador = (totalRecaudado - ahorroUnidad) * 0.08;
-  const montoIngreso = totalRecaudado - ahorroUnidad - colector - operador;
+  const operador = (totalRecaudado - ahorroUnidad - colector) * 0.25;
+  const montoIngreso = totalRecaudado - colector - operador;
 
   if (!concepto) {
     return { success: false, error: "El concepto (motivo del ingreso) es requerido." };

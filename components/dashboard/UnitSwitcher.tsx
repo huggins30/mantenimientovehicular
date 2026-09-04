@@ -13,9 +13,37 @@ interface UnitSwitcherProps {
 export function UnitSwitcher({ unidades, activeUnidadId, canAddUnit = false }: UnitSwitcherProps) {
   const router = useRouter();
   
+  // Ordenar unidades por número de unidad de menor a mayor
+  const sortedUnidades = [...unidades].sort((a, b) => {
+    const valA = (a.numero_unidad || "").trim();
+    const valB = (b.numero_unidad || "").trim();
+
+    // Extraer valores numéricos si existen
+    const numA = parseInt(valA.replace(/\D/g, ""), 10);
+    const numB = parseInt(valB.replace(/\D/g, ""), 10);
+
+    const hasNumA = !isNaN(numA) && !/^s\/?n$/i.test(valA);
+    const hasNumB = !isNaN(numB) && !/^s\/?n$/i.test(valB);
+
+    if (hasNumA && hasNumB) {
+      if (numA !== numB) return numA - numB;
+    } else if (hasNumA) {
+      return -1; // Números primero
+    } else if (hasNumB) {
+      return 1;
+    }
+
+    // Si no tienen número (ej. S/N), ordenar alfabéticamente
+    return (a.numero_unidad || a.placa).localeCompare(
+      b.numero_unidad || b.placa,
+      undefined,
+      { numeric: true }
+    );
+  });
+
   return (
     <div className="flex items-center gap-3 overflow-x-auto pb-2 max-w-full custom-scrollbar">
-      {unidades.map((u) => {
+      {sortedUnidades.map((u) => {
         const isActive = u.id === activeUnidadId;
         return (
           <button

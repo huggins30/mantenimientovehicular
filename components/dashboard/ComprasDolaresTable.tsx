@@ -18,6 +18,7 @@ import {
   ArrowRightLeft,
   Banknote,
   TrendingUp,
+  Car,
 } from "lucide-react";
 
 interface ComprasDolaresTableProps {

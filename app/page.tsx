@@ -36,7 +36,7 @@ import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
 import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { getComprasDolaresByUnidad } from "@/app/actions/dolares";
+import { getAllComprasDolares } from "@/app/actions/dolares";
 import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares } from "@/lib/types";
 
 function formatUSD(amount: number): string {
@@ -143,7 +143,7 @@ export default async function DashboardPage({
   let globalData: any;
   let error: string | null = null;
   try {
-    if (activeTab === "general") {
+    if (activeTab === "general" || activeTab === "dolares") {
       globalData = await getGlobalDashboardData();
     } else if (activeTab !== "nueva-unidad") {
       dashboardData = await getDashboardData(activeUnidadId);
@@ -152,10 +152,10 @@ export default async function DashboardPage({
     error = err instanceof Error ? err.message : "Error al cargar datos.";
   }
 
-  // Compras de dólares (tab específica)
+  // Compras de dólares (tab global para todas las unidades)
   let comprasDolares: ComprasDolares[] = [];
   if (activeTab === "dolares" && !error) {
-    comprasDolares = await getComprasDolaresByUnidad(activeUnidadId);
+    comprasDolares = await getAllComprasDolares();
   }
 
   if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad")) {
@@ -255,18 +255,20 @@ export default async function DashboardPage({
             <div>
               <h2 className="text-2xl font-bold text-white">
                 {activeTab === "general" && "Resumen Global de Flota"}
+                {activeTab === "dolares" && "Compra de Dólares — Todas las Unidades"}
                 {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
                 {activeTab === "resumen" && `Resumen de la Unidad: ${unidad?.placa}`}
                 {activeTab === "aceite" && `Control de Aceite: ${unidad?.placa}`}
                 {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.placa}`}
                 {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.placa}`}
                 {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.placa}`}
-                {activeTab === "dolares" && `Compra de Dólares: ${unidad?.placa}`}
                 {activeTab === "datos" && `Datos de la Unidad: ${unidad?.placa}`}
               </h2>
               <p className="mt-1 text-slate-400 text-sm">
                 {activeTab === "general" 
                   ? `Análisis global de ${globalData?.unidadesCount} vehículos asignados.`
+                  : activeTab === "dolares"
+                  ? `Registro y control global de divisas para todas las unidades (${unidades.length} vehículos).`
                   : activeTab === "nueva-unidad"
                   ? "Agrega los datos de la nueva unidad asignada."
                   : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio})`
@@ -608,19 +610,19 @@ export default async function DashboardPage({
               </section>
             )}
 
-            {/* TAB: COMPRA DE DÓLARES */}
-            {activeTab === "dolares" && unidad && (
+            {/* TAB: COMPRA DE DÓLARES (GLOBAL / TODAS LAS UNIDADES) */}
+            {activeTab === "dolares" && (
               <section>
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
                   <div>
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                       Nueva Compra
                     </h3>
-                    <ComprasDolaresForm unidad={unidad} />
+                    <ComprasDolaresForm unidades={unidades} unidad={unidad} />
                   </div>
                   <div>
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Historial de Compras
+                      Historial de Compras (Todas las Unidades)
                     </h3>
                     <ComprasDolaresTable compras={comprasDolares as ComprasDolares[]} />
                   </div>

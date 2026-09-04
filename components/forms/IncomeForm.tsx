@@ -25,6 +25,7 @@ import {
   User,
   Calculator,
   Gauge,
+  ArrowRightLeft,
 } from "lucide-react";
 
 interface IncomeFormProps {
@@ -42,17 +43,20 @@ function formatCurrency(val: number) {
 }
 
 const paymentFields = [
-  { name: "pago_movil", label: "Pago Móvil", icon: Smartphone, color: "violet" },
-  { name: "movi", label: "Movi", icon: Zap, color: "blue" },
-  { name: "dolares", label: "Dólares", icon: DollarSign, color: "emerald" },
-  { name: "efectivo", label: "Efectivo", icon: Banknote, color: "teal" },
-  { name: "otros", label: "Otros", icon: MoreHorizontal, color: "slate" },
+  { name: "pago_movil", label: "Pago Móvil", icon: Smartphone, color: "violet", colSpan: "col-span-2 sm:col-span-1" },
+  { name: "movi", label: "Movi", icon: Zap, color: "blue", colSpan: "col-span-2 sm:col-span-1" },
+  { name: "dolares", label: "Dólares ($)", icon: DollarSign, color: "emerald", colSpan: "col-span-2 sm:col-span-1" },
+  { name: "monto_bs_dolar", label: "Monto en Bs de $", icon: ArrowRightLeft, color: "amber", colSpan: "col-span-2 sm:col-span-1" },
+  { name: "total_conversion", label: "Total Conversión", icon: Calculator, color: "emerald", colSpan: "col-span-2", readOnly: true },
+  { name: "efectivo", label: "Efectivo", icon: Banknote, color: "teal", colSpan: "col-span-2 sm:col-span-1" },
+  { name: "otros", label: "Otros", icon: MoreHorizontal, color: "slate", colSpan: "col-span-2 sm:col-span-1" },
 ] as const;
 
 const borderColor: Record<string, string> = {
   violet: "focus:border-violet-500/60 focus:ring-violet-500/40",
   blue: "focus:border-blue-500/60 focus:ring-blue-500/40",
   emerald: "focus:border-emerald-500/60 focus:ring-emerald-500/40",
+  amber: "focus:border-amber-500/60 focus:ring-amber-500/40",
   teal: "focus:border-teal-500/60 focus:ring-teal-500/40",
   slate: "focus:border-slate-400/60 focus:ring-slate-400/40",
 };
@@ -60,6 +64,7 @@ const iconColor: Record<string, string> = {
   violet: "text-violet-400",
   blue: "text-blue-400",
   emerald: "text-emerald-400",
+  amber: "text-amber-400",
   teal: "text-teal-400",
   slate: "text-slate-400",
 };
@@ -75,22 +80,37 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
     pago_movil: 0,
     movi: 0,
     dolares: 0,
+    monto_bs_dolar: 0,
     efectivo: 0,
     otros: 0,
   });
 
-  const total = Object.values(values).reduce((s, v) => s + v, 0);
+  const totalConversion = (values.dolares || 0) * (values.monto_bs_dolar || 0);
+  const total =
+    (values.pago_movil || 0) +
+    (values.movi || 0) +
+    (values.efectivo || 0) +
+    (values.otros || 0) +
+    totalConversion;
+
   const ahorroUnidad = total * 0.25;
   const colector = (total - ahorroUnidad) * 0.08;
-  const operador = (total - ahorroUnidad) * 0.25;
-  const ingresoARegistrar = total - ahorroUnidad - colector - operador;
+  const operador = (total - ahorroUnidad - colector) * 0.25;
+  const ingresoARegistrar = total - colector - operador;
 
   const [showSuccess, setShowSuccess] = useState(false);
   useEffect(() => {
     if (state.success) {
       setShowSuccess(true);
       // Resetear valores
-      setValues({ pago_movil: 0, movi: 0, dolares: 0, efectivo: 0, otros: 0 });
+      setValues({
+        pago_movil: 0,
+        movi: 0,
+        dolares: 0,
+        monto_bs_dolar: 0,
+        efectivo: 0,
+        otros: 0,
+      });
       const t = setTimeout(() => setShowSuccess(false), 4000);
       return () => clearTimeout(t);
     }
@@ -226,11 +246,31 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
           <div className="grid grid-cols-2 gap-3">
             {paymentFields.map((field) => {
               const Icon = field.icon;
+              const isReadOnly = "readOnly" in field && field.readOnly;
+              const currentValue = isReadOnly
+                ? (totalConversion > 0 ? totalConversion.toFixed(2) : "")
+                : (values[field.name as keyof typeof values] || "");
+
               return (
-                <div key={field.name} className="space-y-1.5">
-                  <label htmlFor={field.name} className={`block text-xs font-medium ${iconColor[field.color]}`}>
-                    {field.label}
-                  </label>
+                <div key={field.name} className={`space-y-1.5 ${field.colSpan}`}>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor={field.name} className={`block text-xs font-medium ${iconColor[field.color]}`}>
+                      {field.label}
+                    </label>
+                    {isReadOnly && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {values.dolares > 0 && values.monto_bs_dolar > 0 ? (
+                          <span className="text-emerald-400 font-semibold">
+                            ${values.dolares} × {values.monto_bs_dolar} Bs
+                          </span>
+                        ) : values.dolares > 0 ? (
+                          <span className="text-amber-400/90">Indica el monto en Bs</span>
+                        ) : (
+                          "Dólares × Monto en Bs"
+                        )}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <Icon className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${iconColor[field.color]}`} strokeWidth={1.5} />
                     <input
@@ -240,14 +280,21 @@ export function IncomeForm({ unidad }: IncomeFormProps) {
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      value={values[field.name] || ""}
-                      onChange={(e) =>
-                        setValues((prev) => ({
-                          ...prev,
-                          [field.name]: Number(e.target.value) || 0,
-                        }))
+                      readOnly={isReadOnly}
+                      value={currentValue}
+                      onChange={
+                        isReadOnly
+                          ? undefined
+                          : (e) =>
+                            setValues((prev) => ({
+                              ...prev,
+                              [field.name]: Number(e.target.value) || 0,
+                            }))
                       }
-                      className={`w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition-all hover:border-white/20 focus:ring-1 ${borderColor[field.color]}`}
+                      className={`w-full rounded-xl border pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition-all ${isReadOnly
+                        ? "border-emerald-500/30 bg-emerald-500/10 font-mono font-semibold text-emerald-300 cursor-default"
+                        : `border-white/10 bg-white/5 hover:border-white/20 focus:ring-1 ${borderColor[field.color]}`
+                        }`}
                     />
                   </div>
                 </div>
