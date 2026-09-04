@@ -35,11 +35,13 @@ interface IncomeFormProps {
 const initialState: ActionResult<IngresoUnidad> = { success: false };
 
 function formatCurrency(val: number) {
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-  }).format(val);
+  return (
+    "Bs " +
+    val.toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 const paymentFields = [

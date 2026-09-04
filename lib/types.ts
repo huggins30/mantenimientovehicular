@@ -188,6 +188,10 @@ export interface FinancialSummary {
   rentabilidadBolivares: number;
   /** Rentabilidad en USD */
   rentabilidadNeta: number;
+  /** Total acumulado de compras de divisas (USD) */
+  totalDolaresComprados?: number;
+  /** Total de bolívares usados para comprar divisas */
+  totalBsUsadosCompras?: number;
 }
 
 /** Datos completos que carga el dashboard */

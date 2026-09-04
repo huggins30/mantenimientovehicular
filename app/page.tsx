@@ -36,6 +36,7 @@ import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
 import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { getAllComprasDolares } from "@/app/actions/dolares";
 import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares } from "@/lib/types";
 
@@ -44,13 +45,15 @@ function formatUSD(amount: number): string {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-  }).format(amount || 0);
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function formatBs(amount: number): string {
+  const isNeg = (amount || 0) < 0;
   return (
-    "Bs. " +
-    (amount || 0).toLocaleString("es-VE", {
+    (isNeg ? "-Bs. " : "Bs. ") +
+    Math.abs(amount || 0).toLocaleString("es-VE", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
@@ -63,7 +66,13 @@ const formatCurrency = formatUSD;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ unidad?: string; tab?: string }>;
+  searchParams: Promise<{
+    unidad?: string;
+    tab?: string;
+    fecha?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+  }>;
 }) {
   // 1. Sesión
   const supabase = await createSupabaseServerClient();
@@ -81,6 +90,12 @@ export default async function DashboardPage({
   const params = await searchParams;
   const activeTab = params.tab || "resumen";
   const canAddUnit = unidades.length < maxUnidades;
+
+  const dateFilter = {
+    fecha: params.fecha,
+    fechaInicio: params.fechaInicio,
+    fechaFin: params.fechaFin,
+  };
 
   // HEADER ESTÁNDAR para estado vacío o error
   const ErrorHeader = (
@@ -144,9 +159,9 @@ export default async function DashboardPage({
   let error: string | null = null;
   try {
     if (activeTab === "general" || activeTab === "dolares") {
-      globalData = await getGlobalDashboardData();
+      globalData = await getGlobalDashboardData(dateFilter);
     } else if (activeTab !== "nueva-unidad") {
-      dashboardData = await getDashboardData(activeUnidadId);
+      dashboardData = await getDashboardData(activeUnidadId, dateFilter);
     }
   } catch (err) {
     error = err instanceof Error ? err.message : "Error al cargar datos.";
@@ -251,29 +266,38 @@ export default async function DashboardPage({
               <UnitSwitcher unidades={unidades} activeUnidadId={activeUnidadId} canAddUnit={canAddUnit} />
             </div>
 
-            {/* Título condicional según la pestaña */}
-            <div>
-              <h2 className="text-2xl font-bold text-white">
-                {activeTab === "general" && "Resumen Global de Flota"}
-                {activeTab === "dolares" && "Compra de Dólares — Todas las Unidades"}
-                {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
-                {activeTab === "resumen" && `Resumen de la Unidad: ${unidad?.placa}`}
-                {activeTab === "aceite" && `Control de Aceite: ${unidad?.placa}`}
-                {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.placa}`}
-                {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.placa}`}
-                {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.placa}`}
-                {activeTab === "datos" && `Datos de la Unidad: ${unidad?.placa}`}
-              </h2>
-              <p className="mt-1 text-slate-400 text-sm">
-                {activeTab === "general" 
-                  ? `Análisis global de ${globalData?.unidadesCount} vehículos asignados.`
-                  : activeTab === "dolares"
-                  ? `Registro y control global de divisas para todas las unidades (${unidades.length} vehículos).`
-                  : activeTab === "nueva-unidad"
-                  ? "Agrega los datos de la nueva unidad asignada."
-                  : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio})`
-                }
-              </p>
+            {/* Título condicional según la pestaña y Filtros de Fecha */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {activeTab === "general" && "Resumen Global de Flota"}
+                  {activeTab === "dolares" && "Compra de Dólares — Todas las Unidades"}
+                  {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
+                  {activeTab === "resumen" && `Resumen: ${unidad?.numero_unidad ? (unidad.numero_unidad.toLowerCase().includes("unidad") ? unidad.numero_unidad : `Unidad ${unidad.numero_unidad}`) : unidad?.placa}`}
+                  {activeTab === "aceite" && `Control de Aceite: ${unidad?.numero_unidad || unidad?.placa}`}
+                  {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.numero_unidad || unidad?.placa}`}
+                  {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.numero_unidad || unidad?.placa}`}
+                  {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.numero_unidad || unidad?.placa}`}
+                  {activeTab === "datos" && `Datos de la Unidad: ${unidad?.numero_unidad || unidad?.placa}`}
+                </h2>
+                <p className="mt-1 text-slate-400 text-sm">
+                  {activeTab === "general" 
+                    ? `Análisis global de ${globalData?.unidadesCount} vehículos asignados.`
+                    : activeTab === "dolares"
+                    ? `Registro y control global de divisas para todas las unidades (${unidades.length} vehículos).`
+                    : activeTab === "nueva-unidad"
+                    ? "Agrega los datos de la nueva unidad asignada."
+                    : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio}) · ${unidad?.placa}`
+                  }
+                </p>
+              </div>
+
+              {/* Filtro por fecha única y por rango de fechas */}
+              {(activeTab === "general" || activeTab === "resumen") && (
+                <div className="shrink-0">
+                  <DateFilterBar />
+                </div>
+              )}
             </div>
 
             {/* TAB: NUEVA UNIDAD */}
@@ -298,7 +322,11 @@ export default async function DashboardPage({
                       variant="income"
                       currency="USD"
                       badgeText="Dólares"
-                      subtitle="Divisas recaudadas ($)"
+                      subtitle={
+                        (globalData.financialSummary.totalDolaresComprados ?? 0) > 0
+                          ? "Divisas recaudadas y compras ($)"
+                          : "Divisas recaudadas ($)"
+                      }
                     />
                     <FinancialSummaryCard
                       title="Ingresos en Bolívares"
@@ -307,7 +335,11 @@ export default async function DashboardPage({
                       variant="income"
                       currency="BS"
                       badgeText="Bolívares"
-                      subtitle="Pago móvil, efectivo y otros"
+                      subtitle={
+                        (globalData.financialSummary.totalBsUsadosCompras ?? 0) > 0
+                          ? "Neto tras compra de divisas"
+                          : "Total ingreso registrado"
+                      }
                     />
                     <FinancialSummaryCard
                       title="Gastos en Repuestos"
@@ -428,7 +460,11 @@ export default async function DashboardPage({
                       variant="income"
                       currency="USD"
                       badgeText="Dólares"
-                      subtitle="Fletes y pasajes en divisas ($)"
+                      subtitle={
+                        (financialSummary.totalDolaresComprados ?? 0) > 0
+                          ? "Fletes, pasajes y compras ($)"
+                          : "Fletes y pasajes en divisas ($)"
+                      }
                     />
                     <FinancialSummaryCard
                       title="Ingresos en Bolívares"
@@ -437,7 +473,11 @@ export default async function DashboardPage({
                       variant="income"
                       currency="BS"
                       badgeText="Bolívares"
-                      subtitle="Pago móvil, efectivo y otros"
+                      subtitle={
+                        (financialSummary.totalBsUsadosCompras ?? 0) > 0
+                          ? "Neto tras compra de divisas"
+                          : "Total ingreso registrado"
+                      }
                     />
                     <FinancialSummaryCard
                       title="Gastos en Repuestos"
@@ -582,7 +622,10 @@ export default async function DashboardPage({
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                       Historial de Ingresos
                     </h3>
-                    <IncomeTable ingresos={ultimosIngresos as IngresoUnidad[]} />
+                    <IncomeTable
+                      ingresos={ultimosIngresos as IngresoUnidad[]}
+                      totalBsUsadosCompras={financialSummary?.totalBsUsadosCompras ?? 0}
+                    />
                   </div>
                 </div>
               </section>

@@ -33,9 +33,10 @@ function formatUSD(val: number) {
 }
 
 function formatBs(val: number) {
+  const isNeg = (val || 0) < 0;
   return (
-    "Bs. " +
-    (val || 0).toLocaleString("es-VE", {
+    (isNeg ? "-Bs. " : "Bs. ") +
+    Math.abs(val || 0).toLocaleString("es-VE", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
@@ -134,10 +135,14 @@ function ReporteModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-white leading-tight">
-                Reporte — {row.placa}
+                Reporte — {row.numero_unidad
+                  ? (row.numero_unidad.toLowerCase().includes("unidad")
+                      ? row.numero_unidad
+                      : `Unidad ${row.numero_unidad}`)
+                  : row.placa}
               </h2>
               <p className="text-xs text-slate-500">
-                {row.marca} {row.modelo}
+                {row.placa} · {row.marca} {row.modelo}
               </p>
             </div>
           </div>
@@ -302,8 +307,14 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                           <Car className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
                         </div>
                         <div>
-                          <p className="font-bold text-white tracking-wide">{row.placa}</p>
-                          <p className="text-xs text-slate-500">{row.marca} {row.modelo}</p>
+                          <p className="font-bold text-white tracking-wide">
+                            {row.numero_unidad
+                              ? (row.numero_unidad.toLowerCase().includes("unidad")
+                                  ? row.numero_unidad
+                                  : `Unidad ${row.numero_unidad}`)
+                              : row.placa}
+                          </p>
+                          <p className="text-xs text-slate-500">{row.placa} · {row.marca} {row.modelo}</p>
                         </div>
                       </div>
                     </td>
@@ -313,7 +324,13 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                       <span className="block text-emerald-300 font-bold text-sm">
                         {formatUSD(row.totalIngresosDolares ?? 0)}
                       </span>
-                      <span className="block text-cyan-300 font-medium text-xs mt-0.5">
+                      <span
+                        className={`block font-medium text-xs mt-0.5 ${
+                          (row.totalIngresosBolivares ?? 0) < 0
+                            ? "text-red-400"
+                            : "text-cyan-300"
+                        }`}
+                      >
                         {formatBs(row.totalIngresosBolivares ?? 0)}
                       </span>
                     </td>

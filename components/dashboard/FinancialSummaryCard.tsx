@@ -71,27 +71,38 @@ const variantConfig = {
 };
 
 function formatAmount(amount: number, currency: "USD" | "BS" | "PEN" = "USD"): string {
+  const isNeg = amount < 0;
+  const absVal = Math.abs(amount);
+  const prefix = isNeg ? "- " : "";
+
   if (currency === "BS") {
     return (
+      prefix +
       "Bs. " +
-      amount.toLocaleString("es-VE", {
+      absVal.toLocaleString("es-VE", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
     );
   }
   if (currency === "PEN") {
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return (
+      prefix +
+      new Intl.NumberFormat("es-PE", {
+        style: "currency",
+        currency: "PEN",
+        minimumFractionDigits: 2,
+      }).format(absVal)
+    );
   }
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(amount);
+  return (
+    prefix +
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(absVal)
+  );
 }
 
 export function FinancialSummaryCard({
@@ -113,7 +124,7 @@ export function FinancialSummaryCard({
         relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5
         backdrop-blur-sm transition-all duration-300
         hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20
-        ${config.gradient} ${config.border}
+        ${config.gradient} ${isNegative ? "border-red-500/40" : config.border}
       `}
     >
       {/* Decoración de fondo */}
@@ -123,14 +134,18 @@ export function FinancialSummaryCard({
       <div className="relative flex items-start justify-between gap-3">
         {/* Ícono */}
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${config.iconBg}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+            isNegative ? "bg-red-500/20" : config.iconBg
+          }`}
         >
-          <Icon className={`h-5 w-5 ${config.iconColor}`} strokeWidth={1.5} />
+          <Icon className={`h-5 w-5 ${isNegative ? "text-red-400" : config.iconColor}`} strokeWidth={1.5} />
         </div>
 
         {/* Badge tipo */}
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-medium ${config.badge}`}
+          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+            isNegative ? "bg-red-500/20 text-red-300" : config.badge
+          }`}
         >
           {badgeText || config.badgeText}
         </span>
@@ -141,29 +156,28 @@ export function FinancialSummaryCard({
         <p className="text-xs font-medium text-slate-400">{title}</p>
         <p
           className={`mt-1 font-mono font-bold tracking-tight text-xl sm:text-2xl ${
-            variant === "profit"
-              ? isNegative
-                ? "text-red-400"
-                : "text-emerald-400"
+            isNegative
+              ? "text-red-400"
+              : variant === "profit"
+              ? "text-emerald-400"
               : config.amountColor
           }`}
         >
-          {isNegative && variant === "profit" ? "-" : ""}
-          {formatAmount(Math.abs(amount), currency)}
+          {formatAmount(amount, currency)}
         </p>
 
         {secondaryAmount && (
           <p
             className={`mt-0.5 font-mono font-bold tracking-tight text-xl sm:text-2xl ${
-              variant === "profit"
-                ? secondaryAmount.amount < 0
-                  ? "text-red-400"
-                  : "text-cyan-300"
+              secondaryAmount.amount < 0
+                ? "text-red-400"
+                : variant === "profit"
+                ? "text-cyan-300"
                 : "text-slate-200"
             }`}
           >
-            {secondaryAmount.amount < 0 ? "-" : secondaryAmount.amount > 0 && variant === "profit" ? "+" : ""}
-            {formatAmount(Math.abs(secondaryAmount.amount), secondaryAmount.currency)}
+            {secondaryAmount.amount > 0 && variant === "profit" ? "+ " : ""}
+            {formatAmount(secondaryAmount.amount, secondaryAmount.currency)}
           </p>
         )}
 

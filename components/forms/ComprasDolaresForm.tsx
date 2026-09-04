@@ -30,12 +30,23 @@ interface ComprasDolaresFormProps {
 
 const initialState: ActionResult<ComprasDolares> = { success: false };
 
-function formatCurrency(val: number, currency = "PEN", locale = "es-PE") {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(val);
+function formatCurrency(val: number, currency = "BS", locale = "es-VE") {
+  if (currency === "USD") {
+    return (
+      "$" +
+      val.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+  }
+  return (
+    "Bs " +
+    val.toLocaleString(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 export function ComprasDolaresForm({ unidad, unidades }: ComprasDolaresFormProps) {

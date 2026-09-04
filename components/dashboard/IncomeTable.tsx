@@ -30,16 +30,19 @@ import {
 
 interface IncomeTableProps {
   ingresos: IngresoUnidad[];
+  totalBsUsadosCompras?: number;
 }
 
 const PAGE_SIZE = 8;
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-  }).format(amount);
+  return (
+    "Bs " +
+    amount.toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 function formatDate(dateStr: string) {
@@ -223,7 +226,7 @@ function DetalleIngresoModal({
 }
 
 // ── Tabla principal ──────────────────────────────────────────
-export function IncomeTable({ ingresos }: IncomeTableProps) {
+export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableProps) {
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedIngreso, setSelectedIngreso] = useState<IngresoUnidad | null>(null);
@@ -231,7 +234,7 @@ export function IncomeTable({ ingresos }: IncomeTableProps) {
 
   const totalPages = Math.ceil(ingresos.length / PAGE_SIZE);
   const paginated = ingresos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalMonto = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
+  const totalRecaudado = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
 
   function handleDelete(id: number) {
     setDeletingId(id);
@@ -274,8 +277,8 @@ export function IncomeTable({ ingresos }: IncomeTableProps) {
             </span>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500">Total acumulado</p>
-            <p className="font-mono text-sm font-bold text-emerald-300">{formatCurrency(totalMonto)}</p>
+            <p className="text-xs text-slate-500">Ingreso Registrado</p>
+            <p className="font-mono text-sm font-bold text-emerald-300">{formatCurrency(totalRecaudado)}</p>
           </div>
         </div>
 

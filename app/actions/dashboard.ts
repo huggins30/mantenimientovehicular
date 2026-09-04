@@ -16,6 +16,7 @@ import type {
   GastoManoObra,
   RegistroMantenimiento,
   IngresoUnidad,
+  ComprasDolares,
 } from "@/lib/types";
 
 // -------------------------------------------------------
@@ -45,12 +46,43 @@ export async function calcularRentabilidadNeta(
   return totalIngresos - (totalGastosRepuestos + totalMantenimientoAceite + totalManoObra);
 }
 
+export interface DashboardDateFilter {
+  fecha?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+}
+
+function matchesDateFilter(
+  dateStr?: string | null,
+  filter?: DashboardDateFilter
+): boolean {
+  if (!filter) return true;
+  const { fecha, fechaInicio, fechaFin } = filter;
+  if (!fecha && !fechaInicio && !fechaFin) return true;
+
+  if (!dateStr) return false;
+  // Normalizar dateStr a formato YYYY-MM-DD
+  const cleanDate = dateStr.length >= 10 ? dateStr.substring(0, 10) : dateStr;
+
+  if (fecha) {
+    return cleanDate === fecha;
+  }
+  if (fechaInicio && cleanDate < fechaInicio) {
+    return false;
+  }
+  if (fechaFin && cleanDate > fechaFin) {
+    return false;
+  }
+  return true;
+}
+
 // -------------------------------------------------------
 // Obtiene todos los datos del Dashboard en paralelo
 // Filtra por el usuario autenticado actualmente (via RLS + user_id)
 // -------------------------------------------------------
 export async function getDashboardData(
-  unidadId: number
+  unidadId: number,
+  filter?: DashboardDateFilter
 ): Promise<DashboardData> {
   const supabase = await createSupabaseServerClient();
 
@@ -62,7 +94,13 @@ export async function getDashboardData(
 
   // Consultas paralelas para máximo rendimiento
   // El RLS de Supabase garantiza que solo se retornan datos del usuario
-  const [unidadRes, ingresosRes, mantenimientosRes, registrosMantenimientoRes] =
+  const [
+    unidadRes,
+    ingresosRes,
+    mantenimientosRes,
+    registrosMantenimientoRes,
+    comprasDolaresRes,
+  ] =
     await Promise.all([
       supabase
         .from("unidades")
@@ -91,6 +129,12 @@ export async function getDashboardData(
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
         .order("fecha", { ascending: false }),
+
+      supabase
+        .from("compras_dolares")
+        .select("cantidad_dolares, costo_bolivares, tasa_cambio, fecha")
+        .eq("unidad_id", unidadId)
+        .eq("user_id", user.id),
     ]);
 
   // Manejar errores de unidad (crítico)
@@ -101,28 +145,43 @@ export async function getDashboardData(
   }
 
   const unidad: Unidad = unidadRes.data;
-  const ingresos = ingresosRes.data ?? [];
-  const mantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
-  const registrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
+  const rawIngresos = ingresosRes.data ?? [];
+  const rawMantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
+  const rawRegistrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
+  const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
+
+  // Aplicar filtros de fecha si se especificaron
+  const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
+  const mantenimientos = rawMantenimientos.filter((m) => matchesDateFilter(m.fecha_servicio, filter));
+  const registrosMantenimiento = rawRegistrosMantenimiento.filter((r) => matchesDateFilter(r.fecha, filter));
+  const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
 
   // ---- Cálculos financieros ----
-  const totalIngresos = ingresos.reduce(
-    (sum, i) => sum + (i.monto_ingreso ?? 0),
+  const totalDolaresComprados = comprasDolares.reduce(
+    (sum, c) => sum + (Number(c.cantidad_dolares) || 0),
     0
   );
-  const totalIngresosDolares = ingresos.reduce(
-    (sum, i) => sum + (Number(i.dolares) || 0),
-    0
-  );
-  const totalIngresosBolivares = ingresos.reduce(
-    (sum, i) =>
+  const totalBsUsadosCompras = comprasDolares.reduce(
+    (sum, c) =>
       sum +
-      (Number(i.pago_movil) || 0) +
-      (Number(i.movi) || 0) +
-      (Number(i.efectivo) || 0) +
-      (Number(i.otros) || 0),
+      (Number(c.costo_bolivares) ||
+        (Number(c.cantidad_dolares) * Number(c.tasa_cambio)) ||
+        0),
     0
   );
+  const totalIngresos =
+    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
+    totalBsUsadosCompras;
+  const totalIngresosDolares =
+    ingresos.reduce(
+      (sum, i) => sum + (Number(i.dolares) || 0),
+      0
+    ) + totalDolaresComprados;
+  // monto_ingreso ya tiene las deducciones de operador/colector aplicadas (factor 0.7675)
+  // Es el "Ingreso Registrado" neto que el usuario ve en cada registro
+  const totalIngresosBolivares =
+    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
+    totalBsUsadosCompras;
   // Los gastos de mantenimiento (repuesto + mano de obra) ya vienen unidos en costo_total
   const totalGastosMantenimiento = registrosMantenimiento.reduce(
     (sum, r) => sum + (r.costo_total ?? 0),
@@ -153,6 +212,8 @@ export async function getDashboardData(
     rentabilidadDolares,
     rentabilidadBolivares,
     rentabilidadNeta,
+    totalDolaresComprados,
+    totalBsUsadosCompras,
   };
 
   // ---- Estado del semáforo de aceite ----
@@ -230,6 +291,7 @@ export async function getIngresosByUnidad(
 export interface ResumenPorUnidad {
   unidad_id: number;
   placa: string;
+  numero_unidad?: string | null;
   marca: string;
   modelo: string;
   totalIngresos: number;
@@ -242,9 +304,11 @@ export interface ResumenPorUnidad {
   rentabilidadDolares: number;
   rentabilidadBolivares: number;
   rentabilidadNeta: number;
+  totalDolaresComprados?: number;
+  totalBsUsadosCompras?: number;
 }
 
-export async function getGlobalDashboardData(): Promise<{
+export async function getGlobalDashboardData(filter?: DashboardDateFilter): Promise<{
   financialSummary: FinancialSummary;
   unidadesCount: number;
   resumenPorUnidad: ResumenPorUnidad[];
@@ -256,30 +320,55 @@ export async function getGlobalDashboardData(): Promise<{
     throw new Error("No estás autenticado. Por favor inicia sesión.");
   }
 
-  const [unidadesRes, ingresosRes, mantenimientosRes, registrosMantenimientoRes] = await Promise.all([
+  const [
+    unidadesRes,
+    ingresosRes,
+    mantenimientosRes,
+    registrosMantenimientoRes,
+    comprasDolaresRes,
+  ] = await Promise.all([
     supabase.from("unidades").select("id, placa, marca, modelo, numero_unidad").eq("user_id", user.id),
-    supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso, dolares, pago_movil, movi, efectivo, otros").eq("user_id", user.id),
-    supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio").eq("user_id", user.id),
-    supabase.from("registros_mantenimiento").select("unidad_id, costo_total, costo_bolivares, tasa_cambio").eq("user_id", user.id),
+    supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso, dolares, pago_movil, movi, efectivo, otros, fecha").eq("user_id", user.id),
+    supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio, fecha_servicio").eq("user_id", user.id),
+    supabase.from("registros_mantenimiento").select("unidad_id, costo_total, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
+    supabase.from("compras_dolares").select("unidad_id, cantidad_dolares, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
   ]);
 
   const unidades = unidadesRes.data ?? [];
-  const ingresos = ingresosRes.data ?? [];
-  const mantenimientos = mantenimientosRes.data ?? [];
-  const registrosMantenimiento = registrosMantenimientoRes.data ?? [];
+  const rawIngresos = ingresosRes.data ?? [];
+  const rawMantenimientos = mantenimientosRes.data ?? [];
+  const rawRegistrosMantenimiento = registrosMantenimientoRes.data ?? [];
+  const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
+
+  // Aplicar filtros de fecha si se especificaron
+  const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
+  const mantenimientos = rawMantenimientos.filter((m) => matchesDateFilter(m.fecha_servicio, filter));
+  const registrosMantenimiento = rawRegistrosMantenimiento.filter((r) => matchesDateFilter(r.fecha, filter));
+  const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
 
   // Totales globales
-  const totalIngresos = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
-  const totalIngresosDolares = ingresos.reduce((sum, i) => sum + (Number(i.dolares) || 0), 0);
-  const totalIngresosBolivares = ingresos.reduce(
-    (sum, i) =>
-      sum +
-      (Number(i.pago_movil) || 0) +
-      (Number(i.movi) || 0) +
-      (Number(i.efectivo) || 0) +
-      (Number(i.otros) || 0),
+  const totalDolaresComprados = comprasDolares.reduce(
+    (sum, c) => sum + (Number(c.cantidad_dolares) || 0),
     0
   );
+  const totalBsUsadosCompras = comprasDolares.reduce(
+    (sum, c) =>
+      sum +
+      (Number(c.costo_bolivares) ||
+        (Number(c.cantidad_dolares) * Number(c.tasa_cambio)) ||
+        0),
+    0
+  );
+  const totalIngresos =
+    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
+    totalBsUsadosCompras;
+  const totalIngresosDolares =
+    ingresos.reduce((sum, i) => sum + (Number(i.dolares) || 0), 0) +
+    totalDolaresComprados;
+  // monto_ingreso ya tiene las deducciones de operador/colector (factor 0.7675)
+  const totalIngresosBolivares =
+    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
+    totalBsUsadosCompras;
   const totalGastosRepuestos = registrosMantenimiento.reduce((sum, r) => sum + (r.costo_total ?? 0), 0);
   const totalGastosRepuestosBs = registrosMantenimiento.reduce((sum, r) => {
     if (r.costo_bolivares) return sum + Number(r.costo_bolivares);
@@ -297,17 +386,29 @@ export async function getGlobalDashboardData(): Promise<{
   const resumenPorUnidad: ResumenPorUnidad[] = unidades.map((u) => {
     const uid = u.id;
     const uIngresosList = ingresos.filter((i) => i.unidad_id === uid);
-    const uIngresos = uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0);
-    const uIngresosDolares = uIngresosList.reduce((s, i) => s + (Number(i.dolares) || 0), 0);
-    const uIngresosBolivares = uIngresosList.reduce(
-      (s, i) =>
-        s +
-        (Number(i.pago_movil) || 0) +
-        (Number(i.movi) || 0) +
-        (Number(i.efectivo) || 0) +
-        (Number(i.otros) || 0),
-      0
-    );
+    const uDolaresComprados = comprasDolares
+      .filter((c) => c.unidad_id === uid)
+      .reduce((s, c) => s + (Number(c.cantidad_dolares) || 0), 0);
+    const uBsUsadosCompras = comprasDolares
+      .filter((c) => c.unidad_id === uid)
+      .reduce(
+        (s, c) =>
+          s +
+          (Number(c.costo_bolivares) ||
+            (Number(c.cantidad_dolares) * Number(c.tasa_cambio)) ||
+            0),
+        0
+      );
+    const uIngresos =
+      uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0) -
+      uBsUsadosCompras;
+    const uIngresosDolares =
+      uIngresosList.reduce((s, i) => s + (Number(i.dolares) || 0), 0) +
+      uDolaresComprados;
+    // monto_ingreso ya tiene deducciones de operador/colector
+    const uIngresosBolivares =
+      uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0) -
+      uBsUsadosCompras;
     const uGastos = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + (r.costo_total ?? 0), 0);
     const uGastosBs = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => {
       if (r.costo_bolivares) return s + Number(r.costo_bolivares);
@@ -321,6 +422,7 @@ export async function getGlobalDashboardData(): Promise<{
     return {
       unidad_id: uid,
       placa: u.placa,
+      numero_unidad: u.numero_unidad,
       marca: u.marca,
       modelo: u.modelo,
       totalIngresos: uIngresos,
@@ -333,6 +435,8 @@ export async function getGlobalDashboardData(): Promise<{
       rentabilidadDolares: uRentabilidadDolares,
       rentabilidadBolivares: uRentabilidadBolivares,
       rentabilidadNeta: uRentabilidadDolares,
+      totalDolaresComprados: uDolaresComprados,
+      totalBsUsadosCompras: uBsUsadosCompras,
     };
   });
 
@@ -349,6 +453,8 @@ export async function getGlobalDashboardData(): Promise<{
       rentabilidadDolares,
       rentabilidadBolivares,
       rentabilidadNeta,
+      totalDolaresComprados,
+      totalBsUsadosCompras,
     },
     resumenPorUnidad,
   };
