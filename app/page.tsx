@@ -32,13 +32,15 @@ import { IncomeForm } from "@/components/forms/IncomeForm";
 import { IncomeTable } from "@/components/dashboard/IncomeTable";
 import { ComprasDolaresForm } from "@/components/forms/ComprasDolaresForm";
 import { ComprasDolaresTable } from "@/components/dashboard/ComprasDolaresTable";
+import { ChoferPerformanceTable } from "@/components/dashboard/ChoferPerformanceTable";
 import { CreateUnitForm } from "@/components/forms/CreateUnitForm";
 import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { getAllComprasDolares } from "@/app/actions/dolares";
-import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares } from "@/lib/types";
+import { getChoferPerformanceData } from "@/app/actions/chofer";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup } from "@/lib/types";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -158,7 +160,7 @@ export default async function DashboardPage({
   let globalData: any;
   let error: string | null = null;
   try {
-    if (activeTab === "general" || activeTab === "dolares") {
+    if (activeTab === "general" || activeTab === "dolares" || activeTab === "chofer") {
       globalData = await getGlobalDashboardData(dateFilter);
     } else if (activeTab !== "nueva-unidad") {
       dashboardData = await getDashboardData(activeUnidadId, dateFilter);
@@ -171,6 +173,12 @@ export default async function DashboardPage({
   let comprasDolares: ComprasDolares[] = [];
   if (activeTab === "dolares" && !error) {
     comprasDolares = await getAllComprasDolares();
+  }
+
+  // Rendimiento de Choferes (tab global para todas las unidades)
+  let choferData: ChoferPerformanceGroup[] = [];
+  if (activeTab === "chofer" && !error) {
+    choferData = await getChoferPerformanceData(dateFilter);
   }
 
   if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad")) {
@@ -216,7 +224,7 @@ export default async function DashboardPage({
             {/* Derecha: KM + usuario + logout */}
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               {/* KM actual */}
-              {activeTab !== "general" && unidad && (
+              {activeTab !== "general" && activeTab !== "dolares" && activeTab !== "chofer" && unidad && (
                 <div className="hidden sm:flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2">
                   <CalendarDays className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
                   <span className="text-sm font-bold text-violet-300">
@@ -272,6 +280,7 @@ export default async function DashboardPage({
                 <h2 className="text-2xl font-bold text-white">
                   {activeTab === "general" && "Resumen Global de Flota"}
                   {activeTab === "dolares" && "Compra de Dólares — Todas las Unidades"}
+                  {activeTab === "chofer" && "Rendimiento de Operadores (Chofer)"}
                   {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
                   {activeTab === "resumen" && `Resumen: ${unidad?.numero_unidad ? (unidad.numero_unidad.toLowerCase().includes("unidad") ? unidad.numero_unidad : `Unidad ${unidad.numero_unidad}`) : unidad?.placa}`}
                   {activeTab === "aceite" && `Control de Aceite: ${unidad?.numero_unidad || unidad?.placa}`}
@@ -285,6 +294,8 @@ export default async function DashboardPage({
                     ? `Análisis global de ${globalData?.unidadesCount} vehículos asignados.`
                     : activeTab === "dolares"
                     ? `Registro y control global de divisas para todas las unidades (${unidades.length} vehículos).`
+                    : activeTab === "chofer"
+                    ? `Control de ingresos por operador y unidad para evaluar su rendimiento (${unidades.length} vehículos).`
                     : activeTab === "nueva-unidad"
                     ? "Agrega los datos de la nueva unidad asignada."
                     : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio}) · ${unidad?.placa}`
@@ -293,7 +304,7 @@ export default async function DashboardPage({
               </div>
 
               {/* Filtro por fecha única y por rango de fechas */}
-              {(activeTab === "general" || activeTab === "resumen") && (
+              {(activeTab === "general" || activeTab === "resumen" || activeTab === "chofer") && (
                 <div className="shrink-0">
                   <DateFilterBar />
                 </div>
@@ -670,6 +681,13 @@ export default async function DashboardPage({
                     <ComprasDolaresTable compras={comprasDolares as ComprasDolares[]} />
                   </div>
                 </div>
+              </section>
+            )}
+
+            {/* TAB: CHOFER (RENDIMIENTO DE OPERADORES - GLOBAL) */}
+            {activeTab === "chofer" && (
+              <section>
+                <ChoferPerformanceTable grupos={choferData} />
               </section>
             )}
 

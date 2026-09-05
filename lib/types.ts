@@ -16,6 +16,7 @@ export interface Unidad {
   anio: number;
   kilometraje_actual: number;
   estado: "activo" | "inactivo" | "mantenimiento";
+  tipo_unidad?: "Unidad Comun" | "Fraternidad" | string;
   created_at?: string;
 }
 
@@ -117,16 +118,43 @@ export interface IngresoUnidad {
   comprobante?: string;
   // Formas de pago
   pago_movil: number;
-  movi: number;
+  movi?: number;
   dolares: number;
+  monto_bs_dolar?: number;
   efectivo: number;
   otros: number;
+  gastos?: number;
   // Calculados
   ahorro_unidad?: number;
   colector?: number;
   nombre_operador?: string;
   nombre_colector?: string;
   kilometraje_actual?: number;
+  tipo_tabla?: "comun" | "fraternidad";
+  created_at?: string;
+}
+
+// -------------------------------------------------------
+// Tabla: ingresos_diarios_f
+// Registro de ingresos para unidades Fraternidad
+// -------------------------------------------------------
+export interface IngresoUnidadF {
+  id: number;
+  user_id: string;
+  unidad_id: number;
+  concepto: string;
+  monto_ingreso: number;
+  fecha: string;
+  comprobante?: string;
+  kilometraje_actual?: number;
+  nombre_operador?: string;
+  pago_movil: number;
+  dolares: number;
+  monto_bs_dolar: number;
+  efectivo: number;
+  otros: number;
+  gastos: number;
+  ahorro_unidad?: number;
   created_at?: string;
 }
 
@@ -229,5 +257,30 @@ export interface Perfil {
 /** Vista extendida para el panel de admin: perfil + conteo de unidades */
 export interface AdminUsuario extends Perfil {
   total_unidades?: number;
+}
+
+// -------------------------------------------------------
+// Rendimiento de Operadores (Choferes)
+// -------------------------------------------------------
+export interface ChoferIngresoDetalle {
+  id: number;
+  unidad_id: number;
+  numero_unidad: string;
+  placa: string;
+  operador: string;
+  ingreso: number;
+  fecha: string;
+  concepto?: string;
+  comprobante?: string;
+}
+
+export interface ChoferPerformanceGroup {
+  operador: string;
+  unidad_id: number;
+  numero_unidad: string;
+  placa: string;
+  ingreso_total: number;
+  total_viajes: number;
+  detalles: ChoferIngresoDetalle[];
 }
 

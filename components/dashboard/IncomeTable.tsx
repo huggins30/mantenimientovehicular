@@ -26,6 +26,7 @@ import {
   Calculator,
   PiggyBank,
   User,
+  Receipt,
 } from "lucide-react";
 
 interface IncomeTableProps {
@@ -61,9 +62,11 @@ function DetalleIngresoModal({
   ingreso: IngresoUnidad;
   onClose: () => void;
 }) {
+  const esFraternidad = ingreso.tipo_tabla === "fraternidad" || (ingreso.gastos !== undefined && (ingreso.movi === undefined || ingreso.movi === 0));
+
   const paymentRows = [
     { label: "Pago Móvil", value: ingreso.pago_movil ?? 0, icon: Smartphone,     color: "text-violet-300",  bg: "bg-violet-500/10",  border: "border-violet-500/20", isUSD: false },
-    { label: "Movi",       value: ingreso.movi      ?? 0, icon: Zap,             color: "text-blue-300",    bg: "bg-blue-500/10",    border: "border-blue-500/20",   isUSD: false },
+    ...(!esFraternidad ? [{ label: "Movi", value: ingreso.movi ?? 0, icon: Zap, color: "text-blue-300", bg: "bg-blue-500/10", border: "border-blue-500/20", isUSD: false }] : []),
     { label: "Dólares",    value: ingreso.dolares   ?? 0, icon: DollarSign,      color: "text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/20",  isUSD: true  },
     { label: "Efectivo",   value: ingreso.efectivo  ?? 0, icon: Banknote,        color: "text-teal-300",    bg: "bg-teal-500/10",    border: "border-teal-500/20",   isUSD: false },
     { label: "Otros",      value: ingreso.otros     ?? 0, icon: MoreHorizontal,  color: "text-slate-300",   bg: "bg-slate-500/10",   border: "border-slate-500/20",  isUSD: false },
@@ -71,17 +74,44 @@ function DetalleIngresoModal({
 
   // Monto neto registrado
   const montoNeto = ingreso.monto_ingreso ?? 0;
+  const esSinColector = (ingreso.nombre_colector ?? "").trim().toLowerCase() === "sin colector";
 
-  // Total recaudado bruto calculado a partir del neto (montoNeto = totalRecaudado * 0.7675)
-  const totalRecaudado = montoNeto > 0
-    ? (montoNeto / 0.7675)
-    : ((ingreso.pago_movil ?? 0) + (ingreso.movi ?? 0) + (ingreso.efectivo ?? 0) + (ingreso.otros ?? 0));
+  let totalRecaudado = 0;
+  let ahorroUnidad = 0;
+  let colector = 0;
+  let operador = 0;
+  let gastos = 0;
 
-  // Deducciones según la fórmula actual
-  const ahorroUnidad = totalRecaudado * 0.25;
-  const colector = (totalRecaudado - ahorroUnidad) * 0.08;
-  const operador = (totalRecaudado - ahorroUnidad - colector) * 0.25;
-  const ingresoRegistrado = montoNeto || (totalRecaudado - colector - operador);
+  if (esFraternidad) {
+    gastos = ingreso.gastos ?? 0;
+    const baseRecaudado =
+      (ingreso.pago_movil ?? 0) +
+      (ingreso.efectivo ?? 0) +
+      (ingreso.otros ?? 0) +
+      ((ingreso.dolares ?? 0) * (ingreso.monto_bs_dolar ?? 0));
+    totalRecaudado = baseRecaudado > 0 ? baseRecaudado : ((montoNeto + gastos) / 0.775);
+    ahorroUnidad = ingreso.ahorro_unidad ?? (totalRecaudado * 0.25);
+    operador = (totalRecaudado - ahorroUnidad) * 0.30;
+  } else {
+    // Total recaudado bruto calculado a partir del neto:
+    // Con colector: montoNeto = totalRecaudado * 0.7675
+    // Sin colector: montoNeto = totalRecaudado * 0.775
+    totalRecaudado = montoNeto > 0
+      ? (esSinColector ? montoNeto / 0.775 : montoNeto / 0.7675)
+      : ((ingreso.pago_movil ?? 0) + (ingreso.movi ?? 0) + (ingreso.efectivo ?? 0) + (ingreso.otros ?? 0));
+
+    if (esSinColector) {
+      ahorroUnidad = totalRecaudado * 0.25;
+      colector = 0;
+      operador = (totalRecaudado - ahorroUnidad) * 0.30;
+    } else {
+      ahorroUnidad = totalRecaudado * 0.25;
+      colector = (totalRecaudado - ahorroUnidad) * 0.08;
+      operador = (totalRecaudado - ahorroUnidad - colector) * 0.25;
+    }
+  }
+
+  const ingresoRegistrado = montoNeto || (esFraternidad ? totalRecaudado - operador - gastos : totalRecaudado - colector - operador);
 
   const maxVal = Math.max(...paymentRows.map((r) => r.value), 1);
 
@@ -165,57 +195,99 @@ function DetalleIngresoModal({
           </div>
 
           {/* Deducciones calculadas */}
-          <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
-              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro Unidad (25%)
-              </p>
-              <p className="font-mono font-semibold text-blue-300 text-sm">
-                {formatCurrency(ahorroUnidad)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
-              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                <User className="h-3.5 w-3.5 text-orange-400" /> Colector (8%)
-              </p>
-              <p className="font-mono font-semibold text-orange-300 text-sm">
-                {formatCurrency(colector)}
-              </p>
-              {ingreso.nombre_colector && (
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
-                  {ingreso.nombre_colector}
+          {esFraternidad ? (
+            <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro Unidad (25%)
                 </p>
-              )}
-            </div>
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-              <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                <User className="h-3.5 w-3.5 text-amber-400" /> Operador (25%)
-              </p>
-              <p className="font-mono font-semibold text-amber-300 text-sm">
-                {formatCurrency(operador)}
-              </p>
-              {ingreso.nombre_operador && (
-                <p className="text-[10px] text-slate-500 mt-1 truncate">
-                  {ingreso.nombre_operador}
+                <p className="font-mono font-semibold text-blue-300 text-sm">
+                  {formatCurrency(ahorroUnidad)}
                 </p>
-              )}
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador (30%)
+                </p>
+                <p className="font-mono font-semibold text-amber-300 text-sm">
+                  {formatCurrency(operador)}
+                </p>
+                {ingreso.nombre_operador && (
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">
+                    {ingreso.nombre_operador}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <Receipt className="h-3.5 w-3.5 text-rose-400" /> Gastos
+                </p>
+                <p className="font-mono font-semibold text-rose-300 text-sm">
+                  -{formatCurrency(gastos)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-emerald-400 mb-1">
+                  <Banknote className="h-3.5 w-3.5 text-emerald-400" /> Registrado
+                </p>
+                <p className="font-mono font-semibold text-emerald-300 text-sm">
+                  {formatCurrency(ingresoRegistrado)}
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-              <p className="flex items-center gap-1.5 text-emerald-400 mb-1">
-                <Banknote className="h-3.5 w-3.5 text-emerald-400" /> Ingreso Registrado
-              </p>
-              <p className="font-mono font-semibold text-emerald-300 text-sm">
-                {formatCurrency(ingresoRegistrado)}
-              </p>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro Unidad (25%)
+                </p>
+                <p className="font-mono font-semibold text-blue-300 text-sm">
+                  {formatCurrency(ahorroUnidad)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <User className="h-3.5 w-3.5 text-orange-400" /> Colector ({esSinColector ? "0%" : "8%"})
+                </p>
+                <p className="font-mono font-semibold text-orange-300 text-sm">
+                  {formatCurrency(colector)}
+                </p>
+                {ingreso.nombre_colector && (
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">
+                    {ingreso.nombre_colector}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador ({esSinColector ? "30%" : "25%"})
+                </p>
+                <p className="font-mono font-semibold text-amber-300 text-sm">
+                  {formatCurrency(operador)}
+                </p>
+                {ingreso.nombre_operador && (
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">
+                    {ingreso.nombre_operador}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-emerald-400 mb-1">
+                  <Banknote className="h-3.5 w-3.5 text-emerald-400" /> Ingreso Registrado
+                </p>
+                <p className="font-mono font-semibold text-emerald-300 text-sm">
+                  {formatCurrency(ingresoRegistrado)}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-white/10 px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-xl border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+            className="rounded-xl border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
           >
             Cerrar
           </button>
@@ -236,10 +308,13 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
   const paginated = ingresos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalRecaudado = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
 
-  function handleDelete(id: number) {
+  function handleDelete(id: number, tipoTabla?: string) {
     setDeletingId(id);
     startTransition(async () => {
-      await eliminarIngresoAction(id);
+      await eliminarIngresoAction(
+        id,
+        tipoTabla === "fraternidad" ? "ingresos_diarios_f" : "ingresos_unidad"
+      );
       setDeletingId(null);
     });
   }
@@ -333,7 +408,7 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
                       </button>
                       {/* Eliminar */}
                       <button
-                        onClick={() => handleDelete(ingreso.id)}
+                        onClick={() => handleDelete(ingreso.id, ingreso.tipo_tabla)}
                         disabled={isPending && deletingId === ingreso.id}
                         title="Eliminar registro"
                         className="inline-flex items-center justify-center h-7 w-7 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
@@ -373,7 +448,7 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
                   <Eye className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => handleDelete(ingreso.id)}
+                  onClick={() => handleDelete(ingreso.id, ingreso.tipo_tabla)}
                   disabled={isPending && deletingId === ingreso.id}
                   className="text-slate-600 hover:text-red-400 transition-colors disabled:opacity-40"
                 >

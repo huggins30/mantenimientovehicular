@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
+  Layers,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -121,6 +122,32 @@ export function CreateUnitForm() {
                 hover:border-white/20
               "
             />
+          </div>
+        </div>
+
+        {/* Tipo de Unidad */}
+        <div className="space-y-1.5">
+          <label htmlFor="tipo_unidad" className="block text-sm font-medium text-slate-300">
+            Tipo de Unidad <span className="text-red-400">*</span>
+          </label>
+          <div className="relative">
+            <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+            <select
+              id="tipo_unidad"
+              name="tipo_unidad"
+              defaultValue="Unidad Comun"
+              required
+              className="
+                w-full rounded-xl border border-white/10 bg-[#16162a]
+                pl-10 pr-4 py-3 text-sm text-white
+                outline-none transition-all duration-200
+                focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40
+                hover:border-white/20 cursor-pointer
+              "
+            >
+              <option value="Unidad Comun" className="bg-[#16162a] text-white">Unidad Comun</option>
+              <option value="Fraternidad" className="bg-[#16162a] text-white">Fraternidad</option>
+            </select>
           </div>
         </div>
 

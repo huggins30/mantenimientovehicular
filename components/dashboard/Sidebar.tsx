@@ -14,6 +14,7 @@ import {
   Globe,
   Settings,
   DollarSign,
+  UserCheck,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -180,6 +181,43 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
                   Compra de Dólares
                 </p>
                 <p className="text-xs text-slate-500">Todas las unidades</p>
+              </div>
+            </Link>
+
+            {/* Chofer (Global / Rendimiento de Operadores) */}
+            <Link
+              href={`/?tab=chofer`}
+              onClick={() => setIsOpen(false)}
+              className={`
+                group flex items-center gap-4 rounded-xl px-4 py-3 transition-all duration-200 mb-2
+                ${
+                  activeTab === "chofer"
+                    ? "bg-indigo-500/15 ring-1 ring-indigo-500/30"
+                    : "hover:bg-white/5"
+                }
+              `}
+            >
+              <div
+                className={`
+                  flex h-10 w-10 items-center justify-center rounded-lg transition-colors
+                  ${
+                    activeTab === "chofer"
+                      ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 font-bold"
+                      : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
+                  }
+                `}
+              >
+                <UserCheck className="h-5 w-5" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    activeTab === "chofer" ? "text-indigo-300 font-bold" : "text-slate-300"
+                  }`}
+                >
+                  Chofer
+                </p>
+                <p className="text-xs text-slate-500">Rendimiento global</p>
               </div>
             </Link>
 

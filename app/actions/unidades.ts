@@ -25,6 +25,7 @@ export async function crearUnidadAction(
   const modelo = String(formData.get("modelo") ?? "").trim();
   const anio = Number(formData.get("anio"));
   const kilometraje = Number(formData.get("kilometraje_actual"));
+  const tipo_unidad = String(formData.get("tipo_unidad") ?? "Unidad Comun").trim() || "Unidad Comun";
 
   if (!numero_unidad || !placa || !marca || !modelo || isNaN(anio) || isNaN(kilometraje)) {
     return { success: false, error: "Todos los campos son requeridos y deben ser válidos." };
@@ -68,6 +69,7 @@ export async function crearUnidadAction(
       modelo,
       anio,
       kilometraje_actual: kilometraje,
+      tipo_unidad,
       estado: "activo",
     })
     .select()
@@ -249,6 +251,7 @@ export async function editarUnidadAction(
   const marca = String(formData.get("marca") ?? "").trim();
   const modelo = String(formData.get("modelo") ?? "").trim();
   const anio = Number(formData.get("anio"));
+  const tipo_unidad = String(formData.get("tipo_unidad") ?? "Unidad Comun").trim() || "Unidad Comun";
 
   if (isNaN(unidadId) || !numero_unidad || !placa || !marca || !modelo || isNaN(anio)) {
     return { success: false, error: "Todos los campos son requeridos y deben ser válidos." };
@@ -269,6 +272,7 @@ export async function editarUnidadAction(
       marca,
       modelo,
       anio,
+      tipo_unidad,
     })
     .eq("id", unidadId)
     .eq("user_id", user.id)

@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS public.unidades (
   modelo              VARCHAR(50)  NOT NULL,
   anio                INTEGER      NOT NULL CHECK (anio >= 1900),
   kilometraje_actual  INTEGER      NOT NULL DEFAULT 0 CHECK (kilometraje_actual >= 0),
+  tipo_unidad         VARCHAR(50)  NOT NULL DEFAULT 'Unidad Comun'
+                        CHECK (tipo_unidad IN ('Unidad Comun', 'Fraternidad')),
   estado              VARCHAR(20)  NOT NULL DEFAULT 'activo'
                         CHECK (estado IN ('activo', 'inactivo', 'mantenimiento')),
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -190,9 +192,44 @@ CREATE POLICY "mano_obra_select" ON public.gastos_mano_obra FOR SELECT USING (au
 CREATE POLICY "mano_obra_insert" ON public.gastos_mano_obra FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "mano_obra_delete" ON public.gastos_mano_obra FOR DELETE USING (auth.uid() = user_id);
 
+-- ============================================================
+-- TABLA: ingresos_diarios_f (Unidades Fraternidad)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.ingresos_diarios_f (
+  id                  SERIAL PRIMARY KEY,
+  user_id             UUID          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  unidad_id           INTEGER       NOT NULL REFERENCES public.unidades(id) ON DELETE CASCADE,
+  concepto            VARCHAR(200)  NOT NULL,
+  fecha               DATE          NOT NULL,
+  comprobante         VARCHAR(100),
+  kilometraje_actual  INTEGER       CHECK (kilometraje_actual >= 0),
+  nombre_operador     VARCHAR(100),
+  pago_movil          NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (pago_movil >= 0),
+  dolares             NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (dolares >= 0),
+  monto_bs_dolar      NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (monto_bs_dolar >= 0),
+  efectivo            NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (efectivo >= 0),
+  otros               NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (otros >= 0),
+  gastos              NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (gastos >= 0),
+  ahorro_unidad       NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (ahorro_unidad >= 0),
+  monto_ingreso       NUMERIC(12,2) NOT NULL,
+  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
 
--- Habilitar extensión de UUID si se desea usar UUIDs (opcional)
--- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE INDEX IF NOT EXISTS idx_ingresos_df_user_id   ON public.ingresos_diarios_f(user_id);
+CREATE INDEX IF NOT EXISTS idx_ingresos_df_unidad_id ON public.ingresos_diarios_f(unidad_id);
+CREATE INDEX IF NOT EXISTS idx_ingresos_df_fecha     ON public.ingresos_diarios_f(fecha);
+
+ALTER TABLE public.ingresos_diarios_f ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ingresos_df_select" ON public.ingresos_diarios_f;
+DROP POLICY IF EXISTS "ingresos_df_insert" ON public.ingresos_diarios_f;
+DROP POLICY IF EXISTS "ingresos_df_update" ON public.ingresos_diarios_f;
+DROP POLICY IF EXISTS "ingresos_df_delete" ON public.ingresos_diarios_f;
+
+CREATE POLICY "ingresos_df_select" ON public.ingresos_diarios_f FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "ingresos_df_insert" ON public.ingresos_diarios_f FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "ingresos_df_update" ON public.ingresos_diarios_f FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "ingresos_df_delete" ON public.ingresos_diarios_f FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================================
 -- FIN DEL SCRIPT

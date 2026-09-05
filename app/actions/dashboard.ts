@@ -97,6 +97,7 @@ export async function getDashboardData(
   const [
     unidadRes,
     ingresosRes,
+    ingresosFRes,
     mantenimientosRes,
     registrosMantenimientoRes,
     comprasDolaresRes,
@@ -111,6 +112,13 @@ export async function getDashboardData(
 
       supabase
         .from("ingresos_unidad")
+        .select("*")
+        .eq("unidad_id", unidadId)
+        .eq("user_id", user.id)
+        .order("fecha", { ascending: false }),
+
+      supabase
+        .from("ingresos_diarios_f")
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
@@ -145,7 +153,11 @@ export async function getDashboardData(
   }
 
   const unidad: Unidad = unidadRes.data;
-  const rawIngresos = ingresosRes.data ?? [];
+  const rawIngresosComun = (ingresosRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "comun" as const }));
+  const rawIngresosF = (ingresosFRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "fraternidad" as const }));
+  const rawIngresos = [...rawIngresosComun, ...rawIngresosF].sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+  );
   const rawMantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
   const rawRegistrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
@@ -323,19 +335,24 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const [
     unidadesRes,
     ingresosRes,
+    ingresosFRes,
     mantenimientosRes,
     registrosMantenimientoRes,
     comprasDolaresRes,
   ] = await Promise.all([
     supabase.from("unidades").select("id, placa, marca, modelo, numero_unidad").eq("user_id", user.id),
     supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso, dolares, pago_movil, movi, efectivo, otros, fecha").eq("user_id", user.id),
+    supabase.from("ingresos_diarios_f").select("unidad_id, monto_ingreso, dolares, pago_movil, efectivo, otros, gastos, fecha").eq("user_id", user.id),
     supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio, fecha_servicio").eq("user_id", user.id),
     supabase.from("registros_mantenimiento").select("unidad_id, costo_total, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
     supabase.from("compras_dolares").select("unidad_id, cantidad_dolares, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
   ]);
 
   const unidades = unidadesRes.data ?? [];
-  const rawIngresos = ingresosRes.data ?? [];
+  const rawIngresos = [
+    ...(ingresosRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "comun" as const })),
+    ...(ingresosFRes.data ?? []).map((i) => ({ ...i, movi: 0, tipo_tabla: "fraternidad" as const })),
+  ];
   const rawMantenimientos = mantenimientosRes.data ?? [];
   const rawRegistrosMantenimiento = registrosMantenimientoRes.data ?? [];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
