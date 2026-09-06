@@ -110,6 +110,13 @@ BEGIN
   ) THEN
     ALTER TABLE public.ingresos_unidad ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='ingresos_unidad' AND column_name='tipo'
+  ) THEN
+    ALTER TABLE public.ingresos_unidad ADD COLUMN tipo VARCHAR(50) DEFAULT 'Ruta';
+  END IF;
 END $$;
 
 -- ============================================================

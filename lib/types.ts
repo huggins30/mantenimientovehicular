@@ -130,6 +130,7 @@ export interface IngresoUnidad {
   nombre_operador?: string;
   nombre_colector?: string;
   kilometraje_actual?: number;
+  tipo?: "Traslado" | "Ruta" | string;
   tipo_tabla?: "comun" | "fraternidad";
   created_at?: string;
 }

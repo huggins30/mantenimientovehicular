@@ -89,9 +89,11 @@ function DetalleIngresoModal({
       (ingreso.efectivo ?? 0) +
       (ingreso.otros ?? 0) +
       ((ingreso.dolares ?? 0) * (ingreso.monto_bs_dolar ?? 0));
-    totalRecaudado = baseRecaudado > 0 ? baseRecaudado : ((montoNeto + gastos) / 0.775);
-    ahorroUnidad = ingreso.ahorro_unidad ?? (totalRecaudado * 0.25);
-    operador = (totalRecaudado - ahorroUnidad) * 0.30;
+    totalRecaudado = baseRecaudado > 0 ? baseRecaudado : (montoNeto > 0 ? (montoNeto / 0.8125) + gastos : 0);
+    const baseCalculo = Math.max(0, totalRecaudado - gastos);
+    ahorroUnidad = ingreso.ahorro_unidad ?? (baseCalculo * 0.25);
+    const remanente = baseCalculo - ahorroUnidad;
+    operador = remanente * 0.25;
   } else {
     // Total recaudado bruto calculado a partir del neto:
     // Con colector: montoNeto = totalRecaudado * 0.7675
@@ -103,7 +105,9 @@ function DetalleIngresoModal({
     if (esSinColector) {
       ahorroUnidad = totalRecaudado * 0.25;
       colector = 0;
-      operador = (totalRecaudado - ahorroUnidad) * 0.30;
+      // Ruta + Sin Colector → 30%, Traslado + Sin Colector → 25%
+      const pctOpSinColector = ingreso.tipo === "Traslado" ? 0.25 : 0.30;
+      operador = (totalRecaudado - ahorroUnidad) * pctOpSinColector;
     } else {
       ahorroUnidad = totalRecaudado * 0.25;
       colector = (totalRecaudado - ahorroUnidad) * 0.08;
@@ -111,7 +115,7 @@ function DetalleIngresoModal({
     }
   }
 
-  const ingresoRegistrado = montoNeto || (esFraternidad ? totalRecaudado - operador - gastos : totalRecaudado - colector - operador);
+  const ingresoRegistrado = montoNeto || (esFraternidad ? Math.max(0, (totalRecaudado - gastos) - operador) : totalRecaudado - colector - operador);
 
   const maxVal = Math.max(...paymentRows.map((r) => r.value), 1);
 
@@ -133,7 +137,18 @@ function DetalleIngresoModal({
               <TrendingUp className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">{ingreso.concepto}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-white">{ingreso.concepto}</h2>
+                {ingreso.tipo && (
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                    ingreso.tipo === "Traslado"
+                      ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
+                      : "border-indigo-500/30 bg-indigo-500/15 text-indigo-300"
+                  }`}>
+                    {ingreso.tipo}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                 <CalendarDays className="h-3 w-3" />
                 {formatDate(ingreso.fecha)}
@@ -197,6 +212,14 @@ function DetalleIngresoModal({
           {/* Deducciones calculadas */}
           {esFraternidad ? (
             <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
+                  <Receipt className="h-3.5 w-3.5 text-rose-400" /> Gastos
+                </p>
+                <p className="font-mono font-semibold text-rose-300 text-sm">
+                  -{formatCurrency(gastos)}
+                </p>
+              </div>
               <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
                 <p className="flex items-center gap-1.5 text-slate-400 mb-1">
                   <PiggyBank className="h-3.5 w-3.5 text-blue-400" /> Ahorro Unidad (25%)
@@ -207,7 +230,7 @@ function DetalleIngresoModal({
               </div>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
                 <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador (30%)
+                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador (25%)
                 </p>
                 <p className="font-mono font-semibold text-amber-300 text-sm">
                   {formatCurrency(operador)}
@@ -217,14 +240,6 @@ function DetalleIngresoModal({
                     {ingreso.nombre_operador}
                   </p>
                 )}
-              </div>
-              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
-                <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                  <Receipt className="h-3.5 w-3.5 text-rose-400" /> Gastos
-                </p>
-                <p className="font-mono font-semibold text-rose-300 text-sm">
-                  -{formatCurrency(gastos)}
-                </p>
               </div>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
                 <p className="flex items-center gap-1.5 text-emerald-400 mb-1">
@@ -260,7 +275,7 @@ function DetalleIngresoModal({
               </div>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
                 <p className="flex items-center gap-1.5 text-slate-400 mb-1">
-                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador ({esSinColector ? "30%" : "25%"})
+                  <User className="h-3.5 w-3.5 text-amber-400" /> Operador ({esSinColector ? (ingreso.tipo === "Traslado" ? "25%" : "30%") : "25%"})
                 </p>
                 <p className="font-mono font-semibold text-amber-300 text-sm">
                   {formatCurrency(operador)}
@@ -373,7 +388,18 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
               {paginated.map((ingreso) => (
                 <tr key={ingreso.id} className="group transition-colors hover:bg-white/3">
                   <td className="px-5 py-3">
-                    <span className="font-medium text-white">{ingreso.concepto}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white">{ingreso.concepto}</span>
+                      {ingreso.tipo && (
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          ingreso.tipo === "Traslado"
+                            ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
+                            : "border-indigo-500/30 bg-indigo-500/15 text-indigo-300"
+                        }`}>
+                          {ingreso.tipo}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3">
                     {ingreso.comprobante ? (
@@ -432,7 +458,18 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
           {paginated.map((ingreso) => (
             <div key={ingreso.id} className="flex items-start justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-white text-sm truncate">{ingreso.concepto}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-medium text-white text-sm truncate">{ingreso.concepto}</p>
+                  {ingreso.tipo && (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                      ingreso.tipo === "Traslado"
+                        ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
+                        : "border-indigo-500/30 bg-indigo-500/15 text-indigo-300"
+                    }`}>
+                      {ingreso.tipo}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {formatDate(ingreso.fecha)}{ingreso.comprobante ? ` · ${ingreso.comprobante}` : ""}
                 </p>

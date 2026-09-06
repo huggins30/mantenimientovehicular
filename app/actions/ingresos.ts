@@ -40,10 +40,16 @@ export async function registrarIngresoAction(
   const nombreOperador = String(formData.get("nombre_operador") ?? "").trim();
   const nombreColector = String(formData.get("nombre_colector") ?? "").trim();
   const kilometrajeActual = Number(formData.get("kilometraje_actual")) || null;
+  const tipo = String(formData.get("tipo") ?? "").trim() || "Ruta";
 
   // El total es la suma de los pagos en Bs más la conversión de dólares a Bs
   const totalRecaudado = pagoMovil + movi + efectivo + otros + totalConversion;
   const esSinColector = nombreColector.trim().toLowerCase() === "sin colector";
+
+  // Ruta + Sin Colector → Operador 30%
+  // Traslado + Sin Colector → Operador 25%
+  // Con Colector → Colector 8%, Operador 25% (sin importar tipo)
+  const pctOperadorSinColector = tipo === "Traslado" ? 0.25 : 0.30;
 
   let ahorroUnidad = 0;
   let colector = 0;
@@ -52,13 +58,12 @@ export async function registrarIngresoAction(
 
   // Estructura de decisión: Sin colector vs Con colector
   if (esSinColector) {
-    // Sin colector: Operador recibe 30%, Colector no se calcula (0%)
     ahorroUnidad = totalRecaudado * 0.25;
     colector = 0;
-    operador = (totalRecaudado - ahorroUnidad) * 0.30;
+    operador = (totalRecaudado - ahorroUnidad) * pctOperadorSinColector;
     montoIngreso = totalRecaudado - colector - operador;
   } else {
-    // Con colector (código actual): Colector 8%, Operador 25%
+    // Con colector: Colector 8%, Operador 25%
     ahorroUnidad = totalRecaudado * 0.25;
     colector = (totalRecaudado - ahorroUnidad) * 0.08;
     operador = (totalRecaudado - ahorroUnidad - colector) * 0.25;
@@ -75,26 +80,40 @@ export async function registrarIngresoAction(
     return { success: false, error: "La fecha del ingreso es requerida." };
   }
 
-  const { data: ingreso, error } = await supabase
+  const insertPayload: Record<string, any> = {
+    user_id:            user.id,
+    unidad_id:          unidadId,
+    concepto,
+    monto_ingreso:      montoIngreso,
+    fecha,
+    comprobante:        comprobante || null,
+    pago_movil:         pagoMovil,
+    movi,
+    dolares,
+    efectivo,
+    otros,
+    nombre_operador:    nombreOperador || null,
+    nombre_colector:    nombreColector || null,
+    kilometraje_actual: kilometrajeActual,
+    tipo,
+  };
+
+  let { data: ingreso, error } = await supabase
     .from("ingresos_unidad")
-    .insert({
-      user_id:       user.id,
-      unidad_id:     unidadId,
-      concepto,
-      monto_ingreso: montoIngreso,
-      fecha,
-      comprobante:   comprobante || null,
-      pago_movil:    pagoMovil,
-      movi,
-      dolares,
-      efectivo,
-      otros,
-      nombre_operador: nombreOperador || null,
-      nombre_colector: nombreColector || null,
-      kilometraje_actual: kilometrajeActual,
-    })
+    .insert(insertPayload)
     .select()
     .single();
+
+  if (error && (error.message?.includes("tipo") || error.code === "42703" || (error as any).code === "PGRST204")) {
+    delete insertPayload.tipo;
+    const retry = await supabase
+      .from("ingresos_unidad")
+      .insert(insertPayload)
+      .select()
+      .single();
+    ingreso = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     return { success: false, error: `Error al guardar el ingreso: ${error.message}` };
@@ -156,10 +175,13 @@ export async function registrarIngresoFraternidadAction(
   // Total recaudado de las formas de pago
   const totalRecaudado = pagoMovil + efectivo + otros + totalConversion;
   
-  // Regla Fraternidad: Ahorro de unidad 25%, Operador 30% (sin colector), Gastos se restan al ingreso
-  const ahorroUnidad = totalRecaudado * 0.25;
-  const operador = (totalRecaudado - ahorroUnidad) * 0.30;
-  const montoIngreso = totalRecaudado - operador - gastos;
+  // Regla Fraternidad: Total Bruto - Gastos -> Ahorro 25% -> Operador 25% del remanente -> Ingreso a Registrar = Restante + Ahorro Unidad
+  const baseCalculo = Math.max(0, totalRecaudado - gastos);
+  const ahorroUnidad = baseCalculo * 0.25;
+  const remanente = baseCalculo - ahorroUnidad;
+  const operador = remanente * 0.25;
+  const restante = remanente - operador;
+  const montoIngreso = Math.max(0, restante + ahorroUnidad);
 
   if (!concepto) {
     return { success: false, error: "El concepto (motivo del ingreso) es requerido." };
