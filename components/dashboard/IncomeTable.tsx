@@ -95,12 +95,27 @@ function DetalleIngresoModal({
     const remanente = baseCalculo - ahorroUnidad;
     operador = remanente * 0.25;
   } else {
-    // Total recaudado bruto calculado a partir del neto:
-    // Con colector: montoNeto = totalRecaudado * 0.7675
-    // Sin colector: montoNeto = totalRecaudado * 0.775
-    totalRecaudado = montoNeto > 0
-      ? (esSinColector ? montoNeto / 0.775 : montoNeto / 0.7675)
-      : ((ingreso.pago_movil ?? 0) + (ingreso.movi ?? 0) + (ingreso.efectivo ?? 0) + (ingreso.otros ?? 0));
+    // Total recaudado bruto: usar suma directa del desglose de pagos si existe
+    const baseRecaudado =
+      (ingreso.pago_movil ?? 0) +
+      (ingreso.movi ?? 0) +
+      (ingreso.efectivo ?? 0) +
+      (ingreso.otros ?? 0) +
+      ((ingreso.dolares ?? 0) * (ingreso.monto_bs_dolar ?? 0));
+
+    if (baseRecaudado > 0) {
+      totalRecaudado = baseRecaudado;
+    } else {
+      // Reconstrucción a partir del neto si no hay desglose guardado (registros antiguos):
+      if (esSinColector) {
+        // Traslado + Sin Colector → factor 0.8125; Ruta + Sin Colector → factor 0.775
+        const factor = ingreso.tipo === "Traslado" ? 0.8125 : 0.775;
+        totalRecaudado = montoNeto > 0 ? montoNeto / factor : 0;
+      } else {
+        // Con Colector → factor 0.7675
+        totalRecaudado = montoNeto > 0 ? montoNeto / 0.7675 : 0;
+      }
+    }
 
     if (esSinColector) {
       ahorroUnidad = totalRecaudado * 0.25;
