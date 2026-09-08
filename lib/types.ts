@@ -102,6 +102,12 @@ export interface RegistroMantenimiento {
   proveedor?: string;
   notas?: string;
   created_at?: string;
+  /** Precio en Bs de piezas/repuesto ingresado directamente (NO se convierte a USD) */
+  precio_bs_repuestos?: number;
+  /** Precio en Bs de mano de obra ingresado directamente (NO se convierte a USD) */
+  precio_bs_mano_obra?: number;
+  /** Abono / adelanto recibido para este mantenimiento (en USD). Saldo = costo_total - abono */
+  abono?: number;
 }
 
 // -------------------------------------------------------
@@ -206,6 +212,8 @@ export interface FinancialSummary {
   totalIngresos: number;
   totalIngresosDolares: number;
   totalIngresosBolivares: number;
+  /** Ingresos en Bolívares antes de restar gastos directos en Bs */
+  totalIngresosBolivaresBruto?: number;
   totalGastosRepuestos: number;
   totalGastosRepuestosBs?: number;
   totalMantenimientoAceite: number;
@@ -213,7 +221,7 @@ export interface FinancialSummary {
   totalManoObra: number;
   /** Rentabilidad en Dólares ($) = Ingresos USD - Gastos USD */
   rentabilidadDolares: number;
-  /** Rentabilidad en Bolívares (Bs) = Ingresos Bs - Gastos Bs */
+  /** Rentabilidad en Bolívares (Bs) = Ingresos Bs - Gastos Bs (conversión) */
   rentabilidadBolivares: number;
   /** Rentabilidad en USD */
   rentabilidadNeta: number;
@@ -221,6 +229,12 @@ export interface FinancialSummary {
   totalDolaresComprados?: number;
   /** Total de bolívares usados para comprar divisas */
   totalBsUsadosCompras?: number;
+  /** Total de gastos en Bolívares directos (precio_bs_repuestos + precio_bs_mano_obra, NO convertidos a USD) */
+  totalGastosBsDirecto?: number;
+  /** Rentabilidad en Bs = Ingresos Bs - Gastos Bs directos */
+  rentabilidadBsDirecta?: number;
+  /** Total de saldos pendientes por pagar ($) = Solo mantenimientos y repuestos con abono registrado (abono > 0 y costo_total > abono) */
+  totalSaldoPendiente?: number;
 }
 
 /** Datos completos que carga el dashboard */

@@ -22,7 +22,6 @@ import {
   AlertCircle,
   Calculator,
   Save,
-  ArrowRightLeft,
   Banknote,
   Plus,
   Trash2,
@@ -37,7 +36,7 @@ interface PiezaItem {
   concepto: string;
   cantidad: number | string;
   costoUSD: string;
-  costoBs: string;
+  precioBsDirecto: string;
 }
 
 const initialState: ActionResult<RegistroMantenimiento> = { success: false };
@@ -67,23 +66,26 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
   );
 
   const [piezas, setPiezas] = useState<PiezaItem[]>([
-    { id: "1", concepto: "", cantidad: 1, costoUSD: "", costoBs: "" },
+    { id: "1", concepto: "", cantidad: 1, costoUSD: "", precioBsDirecto: "" },
   ]);
 
   const [costoManoUSD, setCostoManoUSD] = useState<string>("");
-  const [costoManoBs, setCostoManoBs] = useState<string>("");
 
-  const [tasaCambio, setTasaCambio] = useState<string>("");
+  // Precio en Bs DIRECTO para Mano de Obra — no influye en la conversión a USD
+  const [precioBsMano, setPrecioBsMano] = useState<string>("");
+
+  // Abono (adelanto recibido, en USD)
+  const [abono, setAbono] = useState<string>("");
 
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     if (state.success) {
       setShowSuccess(true);
-      setPiezas([{ id: "1", concepto: "", cantidad: 1, costoUSD: "", costoBs: "" }]);
+      setPiezas([{ id: "1", concepto: "", cantidad: 1, costoUSD: "", precioBsDirecto: "" }]);
       setCostoManoUSD("");
-      setCostoManoBs("");
-      // Mantenemos tasaCambio para facilitar múltiples registros sucesivos
+      setPrecioBsMano("");
+      setAbono("");
       const t = setTimeout(() => setShowSuccess(false), 4000);
       return () => clearTimeout(t);
     }
@@ -92,7 +94,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
   const agregarPieza = () => {
     setPiezas((prev) => [
       ...prev,
-      { id: Date.now().toString(), concepto: "", cantidad: 1, costoUSD: "", costoBs: "" },
+      { id: Date.now().toString(), concepto: "", cantidad: 1, costoUSD: "", precioBsDirecto: "" },
     ]);
   };
 
@@ -107,64 +109,47 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
     );
   };
 
-  const handleTasaChange = (val: string) => {
-    setTasaCambio(val);
-  };
-
-  const handleManoUSDChange = (val: string) => {
-    setCostoManoUSD(val);
-  };
-
-  const handleManoBsChange = (val: string) => {
-    setCostoManoBs(val);
-  };
-
-  const numTasa = parseFloat(tasaCambio) || 0;
-
   // Cálculos acumulados de todas las piezas
+  // SOLO el campo costoUSD afecta el total en dólares
   let totalRepUSD = 0;
-  let totalRepUSDDirecto = 0;
-  let totalRepBsDirecto = 0;
   let totalPiezasCount = 0;
+  let totalBsDirectoRepuestos = 0;
 
   const piezasCalculadas = piezas.map((p) => {
     const cant = Math.max(1, parseInt(String(p.cantidad)) || 1);
     const cUSD = parseFloat(p.costoUSD) || 0;
-    const cBs = parseFloat(p.costoBs) || 0;
+    const cBsDir = parseFloat(p.precioBsDirecto) || 0;
 
-    const unitBsToUSD = numTasa > 0 ? cBs / numTasa : 0;
-    const unitTotalUSD = cUSD + unitBsToUSD;
-    const itemSubUSD = cant * unitTotalUSD;
-    const itemSubBs = numTasa > 0 ? itemSubUSD * numTasa : cant * cBs;
+    // Subtotal USD de esta pieza = cantidad × costo unitario USD
+    const itemSubUSD = cant * cUSD;
+    // Precio Bs directo total de esta pieza (informativo, no afecta USD)
+    const itemBsDirecto = cant * cBsDir;
 
     totalRepUSD += itemSubUSD;
-    totalRepUSDDirecto += cant * cUSD;
-    totalRepBsDirecto += cant * cBs;
     totalPiezasCount += cant;
+    totalBsDirectoRepuestos += itemBsDirecto;
 
     return {
       ...p,
       cant,
       cUSD,
-      cBs,
-      unitBsToUSD,
+      cBsDir,
       itemSubUSD,
-      itemSubBs,
+      itemBsDirecto,
     };
   });
 
   const subtotalRepUSD = totalRepUSD;
-  const subtotalRepBs = numTasa > 0 ? subtotalRepUSD * numTasa : totalRepBsDirecto;
 
   const numCostoManoUSD = parseFloat(costoManoUSD) || 0;
-  const numCostoManoBs = parseFloat(costoManoBs) || 0;
-  const manoBsToUSD = numTasa > 0 ? numCostoManoBs / numTasa : 0;
-  const subtotalManoUSD = numCostoManoUSD + manoBsToUSD;
-  const subtotalManoBs = numTasa > 0 ? subtotalManoUSD * numTasa : numCostoManoBs;
+  const subtotalManoUSD = numCostoManoUSD;
 
-  // Total General que incluye Piezas y Repuesto y Mano de Obra
+  // Total General en USD = Piezas + Mano de Obra (solo montos USD)
   const totalGeneralUSD = subtotalRepUSD + subtotalManoUSD;
-  const totalGeneralBs = numTasa > 0 ? totalGeneralUSD * numTasa : subtotalRepBs + subtotalManoBs;
+
+  // Abono y saldo pendiente
+  const numAbono = parseFloat(abono) || 0;
+  const saldoPendiente = totalGeneralUSD - numAbono;
 
   const nombresConcatenados = piezas
     .filter((p) => p.concepto.trim() !== "")
@@ -210,6 +195,11 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
         <input type="hidden" name="piezas_json" value={JSON.stringify(piezas)} />
         <input type="hidden" name="rep_concepto" value={nombresConcatenados} />
         <input type="hidden" name="rep_cantidad" value={totalPiezasCount} />
+        <input type="hidden" name="precio_bs_repuestos" value={totalBsDirectoRepuestos} />
+        <input type="hidden" name="precio_bs_mano_obra" value={precioBsMano} />
+        <input type="hidden" name="abono" value={abono} />
+        {/* tasa_cambio ya no se usa en los cálculos pero lo enviamos vacío para compatibilidad */}
+        <input type="hidden" name="tasa_cambio" value="" />
 
         {/* ── Fecha + Proveedor ── */}
         <div className="grid grid-cols-2 gap-3">
@@ -243,32 +233,6 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
               />
             </div>
-          </div>
-        </div>
-
-        {/* ── Tasa de Cambio (Destacada arriba para alimentar conversiones en vivo) ── */}
-        <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="tasa_cambio" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-400">
-              <ArrowRightLeft className="h-3.5 w-3.5" />
-              Tasa Bs/USD <span className="text-red-400">*</span>
-            </label>
-            <span className="text-[11px] text-cyan-400/80 font-mono">Conversión de Bs a Dólares en subtotal</span>
-          </div>
-          <div className="relative">
-            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-cyan-400" />
-            <input
-              id="tasa_cambio"
-              name="tasa_cambio"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Ej: 798.35"
-              required
-              value={tasaCambio}
-              onChange={(e) => handleTasaChange(e.target.value)}
-              className="w-full rounded-xl border border-cyan-500/30 bg-black/40 pl-9 pr-4 py-2 text-sm font-mono font-medium text-cyan-200 placeholder-slate-500 outline-none transition-all hover:border-cyan-500/50 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-500/40"
-            />
           </div>
         </div>
 
@@ -313,9 +277,6 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                     {p.itemSubUSD > 0 && (
                       <span className="font-mono text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                         {formatUSD(p.itemSubUSD)}
-                        {numTasa > 0 && p.cBs > 0 && (
-                          <span className="text-amber-400/70 ml-1">({formatBs(p.itemSubBs)})</span>
-                        )}
                       </span>
                     )}
 
@@ -350,27 +311,27 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                   </div>
                 </div>
 
-                {/* Cantidad + Costo USD + Monto Bs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {/* Cantidad */}
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-medium text-slate-400">
-                      Cantidad <span className="text-red-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        required
-                        value={p.cantidad}
-                        onChange={(e) => actualizarPieza(p.id, "cantidad", e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40"
-                      />
-                    </div>
+                {/* Cantidad (debajo del nombre de la pieza) */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium text-slate-400">
+                    Cantidad <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      required
+                      value={p.cantidad}
+                      onChange={(e) => actualizarPieza(p.id, "cantidad", e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40"
+                    />
                   </div>
+                </div>
 
+                {/* Tres campos: Costo USD | Monto Bs (read-only, calculado) | Precio Bs Directo */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {/* Costo Unitario USD */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-medium text-slate-400">
@@ -390,25 +351,44 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                     </div>
                   </div>
 
-                  {/* Monto Unitario Bs */}
+                  {/* Monto Unitario Bs — informativo = costo USD × cantidad (read-only display) */}
                   <div className="space-y-1">
-                    <label className="block text-[11px] font-medium text-amber-400">
-                      Monto Unit. (Bs)
+                    <label className="block text-[11px] font-medium text-slate-400">
+                      Subtotal ($)
+                    </label>
+                    <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-slate-300 h-[38px]">
+                      {p.itemSubUSD > 0 ? formatUSD(p.itemSubUSD) : <span className="text-slate-600">—</span>}
+                    </div>
+                  </div>
+
+                  {/* Precio Bs Directo (NO convierte a USD) */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium text-purple-400">
+                      Precio Bs
                     </label>
                     <div className="relative">
-                      <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-400/70" />
+                      <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-purple-400/70" />
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         placeholder="0.00"
-                        value={p.costoBs}
-                        onChange={(e) => actualizarPieza(p.id, "costoBs", e.target.value)}
-                        className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 pl-9 pr-3 py-2 text-sm font-mono text-amber-200 placeholder-slate-500 outline-none transition-all hover:border-amber-500/50 focus:border-amber-400 focus:ring-1 focus:ring-amber-500/40"
+                        value={p.precioBsDirecto}
+                        onChange={(e) => actualizarPieza(p.id, "precioBsDirecto", e.target.value)}
+                        className="w-full rounded-xl border border-purple-500/30 bg-purple-500/10 pl-9 pr-3 py-2 text-sm font-mono text-purple-200 placeholder-slate-500 outline-none transition-all hover:border-purple-500/50 focus:border-purple-400 focus:ring-1 focus:ring-purple-500/40"
                       />
                     </div>
                   </div>
                 </div>
+
+                {/* Subtotal Bs Directo por pieza (si tiene valor) */}
+                {p.itemBsDirecto > 0 && (
+                  <div className="flex items-center justify-end gap-1.5 text-[11px] text-purple-400/80 font-mono">
+                    <Banknote className="h-3 w-3" />
+                    Bs directo: {formatBs(p.itemBsDirecto)}
+                    {p.cant > 1 && <span className="text-purple-400/60">({p.cant} × {formatBs(p.cBsDir)})</span>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -423,7 +403,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
             + Agregar otra pieza de repuesto
           </button>
 
-          {/* Subtotal consolidado de todas las piezas con conversión */}
+          {/* Subtotal consolidado de todas las piezas */}
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
@@ -434,31 +414,23 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 {formatUSD(subtotalRepUSD)}
               </span>
             </div>
+          </div>
 
-            {/* Detalle del cálculo y conversión */}
-            <div className="text-[11px] text-slate-400 space-y-1 border-t border-amber-500/20 pt-1.5">
+          {/* Total Bs Directo de todas las piezas (si hay) */}
+          {totalBsDirectoRepuestos > 0 && (
+            <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-2.5">
               <div className="flex items-center justify-between">
-                <span>Total en Dólares ($):</span>
-                <span className="font-mono font-medium text-slate-300">
-                  {formatUSD(totalRepUSDDirecto)}
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                  <Banknote className="h-3.5 w-3.5" />
+                  Total Precio Bs (Directo — Piezas)
+                  <span className="text-[10px] text-purple-400/60 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 ml-1">No afecta $</span>
+                </span>
+                <span className="font-mono text-sm font-bold text-purple-300">
+                  {formatBs(totalBsDirectoRepuestos)}
                 </span>
               </div>
-              {totalRepBsDirecto > 0 && (
-                <div className="flex items-center justify-between text-amber-200">
-                  <span>Total en Bolívares (convertidos a $):</span>
-                  <span className="font-mono">
-                    {formatBs(totalRepBsDirecto)} {numTasa > 0 ? `→ ${formatUSD(totalRepUSD - totalRepUSDDirecto)}` : ""}
-                  </span>
-                </div>
-              )}
-              {numTasa > 0 && subtotalRepBs > 0 && (
-                <div className="flex items-center justify-between text-amber-400 font-semibold pt-0.5">
-                  <span>Equivalente total en Bs:</span>
-                  <span className="font-mono">{formatBs(subtotalRepBs)}</span>
-                </div>
-              )}
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── SECCIÓN: Mano de Obra ── */}
@@ -495,12 +467,12 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
             </div>
           </div>
 
-          {/* Costo USD + Monto en Bs (Separados) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* Costo Mano de Obra USD (Separado) */}
+          {/* Costo USD | Subtotal (read-only) | Precio Bs Directo */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Costo Mano de Obra USD */}
             <div className="space-y-1.5">
               <label htmlFor="mo_costo" className="block text-xs font-medium text-slate-400">
-                Costo Mano de Obra ($)
+                Costo M.O. ($)
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
@@ -512,70 +484,108 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                   step="0.01"
                   placeholder="0.00"
                   value={costoManoUSD}
-                  onChange={(e) => handleManoUSDChange(e.target.value)}
+                  onChange={(e) => setCostoManoUSD(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
                 />
               </div>
             </div>
 
-            {/* Monto Mano de Obra en Bs (Separado) */}
+            {/* Subtotal M.O. (informativo, read-only) */}
             <div className="space-y-1.5">
-              <label htmlFor="mo_costo_bs" className="block text-xs font-medium text-orange-400">
-                Monto Mano de Obra (Bs)
+              <label className="block text-xs font-medium text-slate-400">
+                Subtotal ($)
+              </label>
+              <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-mono text-slate-300 h-[42px]">
+                {subtotalManoUSD > 0 ? formatUSD(subtotalManoUSD) : <span className="text-slate-600">—</span>}
+              </div>
+            </div>
+
+            {/* Precio Bs Directo M.O. (NO convierte a USD) */}
+            <div className="space-y-1.5">
+              <label htmlFor="mo_precio_bs" className="block text-xs font-medium text-purple-400">
+                Precio Bs
               </label>
               <div className="relative">
-                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-orange-400/70" />
+                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-purple-400/70" />
                 <input
-                  id="mo_costo_bs"
-                  name="mo_costo_bs"
+                  id="mo_precio_bs"
                   type="number"
                   min="0"
                   step="0.01"
                   placeholder="0.00"
-                  value={costoManoBs}
-                  onChange={(e) => handleManoBsChange(e.target.value)}
-                  className="w-full rounded-xl border border-orange-500/30 bg-orange-500/10 pl-9 pr-3 py-2.5 text-sm font-mono text-orange-200 placeholder-slate-500 outline-none transition-all hover:border-orange-500/50 focus:border-orange-400 focus:ring-1 focus:ring-orange-500/40"
+                  value={precioBsMano}
+                  onChange={(e) => setPrecioBsMano(e.target.value)}
+                  className="w-full rounded-xl border border-purple-500/30 bg-purple-500/10 pl-9 pr-3 py-2.5 text-sm font-mono text-purple-200 placeholder-slate-500 outline-none transition-all hover:border-purple-500/50 focus:border-purple-400 focus:ring-1 focus:ring-purple-500/40"
                 />
               </div>
             </div>
           </div>
 
-          {/* Subtotal mano de obra con conversión de Bs a Dólares */}
-          <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-orange-300">
-                <Calculator className="h-3.5 w-3.5" />
-                Subtotal Mano de Obra
-              </span>
-              <span className="font-mono text-sm sm:text-base font-bold text-orange-300">
-                {formatUSD(subtotalManoUSD)}
-              </span>
-            </div>
-
-            {/* Detalle del cálculo y conversión */}
-            <div className="text-[11px] text-slate-400 space-y-1 border-t border-orange-500/20 pt-1.5">
+          {/* Total Bs Directo Mano de Obra (si hay) */}
+          {(parseFloat(precioBsMano) || 0) > 0 && (
+            <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-2.5">
               <div className="flex items-center justify-between">
-                <span>Dólares ($):</span>
-                <span className="font-mono font-medium text-slate-300">
-                  {formatUSD(numCostoManoUSD)}
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                  <Banknote className="h-3.5 w-3.5" />
+                  Precio Bs (Directo — M.O.)
+                  <span className="text-[10px] text-purple-400/60 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 ml-1">No afecta $</span>
+                </span>
+                <span className="font-mono text-sm font-bold text-purple-300">
+                  {formatBs(parseFloat(precioBsMano) || 0)}
                 </span>
               </div>
-              {numCostoManoBs > 0 && (
-                <div className="flex items-center justify-between text-orange-200">
-                  <span>Bolívares (convertidos a $):</span>
-                  <span className="font-mono">
-                    {formatBs(numCostoManoBs)} {numTasa > 0 ? `→ ${formatUSD(manoBsToUSD)}` : ""}
-                  </span>
-                </div>
-              )}
-              {numTasa > 0 && subtotalManoBs > 0 && (
-                <div className="flex items-center justify-between text-orange-400 font-semibold pt-0.5">
-                  <span>Equivalente total en Bs:</span>
-                  <span className="font-mono">{formatBs(subtotalManoBs)}</span>
-                </div>
-              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Abono (Adelanto recibido) ── */}
+        <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/20">
+              <DollarSign className="h-3.5 w-3.5 text-green-400" strokeWidth={1.5} />
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-green-400">
+              Abono / Adelanto
+            </span>
+            <span className="text-[11px] text-green-400/60 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
+              Opcional
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="abono_input" className="block text-xs font-medium text-slate-400">
+              Abono recibido ($)
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-400/70" />
+              <input
+                id="abono_input"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={abono}
+                onChange={(e) => setAbono(e.target.value)}
+                className="w-full rounded-xl border border-green-500/30 bg-green-500/10 pl-9 pr-3 py-2.5 text-sm font-mono text-green-200 placeholder-slate-500 outline-none transition-all hover:border-green-500/50 focus:border-green-400 focus:ring-1 focus:ring-green-500/40"
+              />
             </div>
           </div>
+
+          {/* Preview saldo si hay abono */}
+          {numAbono > 0 && totalGeneralUSD > 0 && (
+            <div className={`rounded-lg px-3 py-2.5 flex items-center justify-between text-sm font-mono font-bold border ${
+              saldoPendiente <= 0
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                : "bg-amber-500/15 border-amber-500/30 text-amber-300"
+            }`}>
+              <span className="text-xs font-semibold">
+                {saldoPendiente <= 0 ? "✅ Saldo: CANCELADO" : "⏳ Saldo pendiente:"}
+              </span>
+              <span>
+                {saldoPendiente <= 0 ? formatUSD(0) : formatUSD(saldoPendiente)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Total General (Incluye Piezas y Repuesto y Mano de Obra) ── */}
@@ -593,14 +603,15 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
           </div>
 
           <div className="border-t border-violet-500/20 pt-2 space-y-1.5">
-            {numTasa > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-cyan-300 flex items-center gap-1">
-                  <Banknote className="h-3.5 w-3.5 text-cyan-400" />
-                  Total General en Bolívares (Bs):
+            {/* ── Resumen Bs Directo ── */}
+            {(totalBsDirectoRepuestos > 0 || (parseFloat(precioBsMano) || 0) > 0) && (
+              <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/10 px-3 py-1.5">
+                <span className="text-xs font-semibold text-purple-300 flex items-center gap-1">
+                  <Banknote className="h-3.5 w-3.5 text-purple-400" />
+                  Gasto en Bs (Directo):
                 </span>
-                <span className="font-mono text-base font-bold text-cyan-300">
-                  {formatBs(totalGeneralBs)}
+                <span className="font-mono text-sm font-bold text-purple-300">
+                  {formatBs(totalBsDirectoRepuestos + (parseFloat(precioBsMano) || 0))}
                 </span>
               </div>
             )}

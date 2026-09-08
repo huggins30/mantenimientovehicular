@@ -18,6 +18,9 @@ import {
   X,
   Calculator,
   Search,
+  Banknote,
+  ArrowRightLeft,
+  DollarSign,
 } from "lucide-react";
 
 interface MantenimientoTableProps {
@@ -58,26 +61,40 @@ function DetalleModal({
   registro: RegistroMantenimiento;
   onClose: () => void;
 }) {
-  const tasa = registro.tasa_cambio || 0;
-  const repBs = tasa > 0 ? registro.rep_subtotal * tasa : 0;
-  const moBs = tasa > 0 ? registro.mo_costo * tasa : 0;
-  const totalBs = registro.costo_bolivares || (tasa > 0 ? registro.costo_total * tasa : 0);
+  const tasa = Number(registro.tasa_cambio) || 0;
+  
+  // Bolívares convertidos por tasa
+  const repBs = tasa > 0 ? (Number(registro.rep_subtotal) || 0) * tasa : 0;
+  const moBs = tasa > 0 ? (Number(registro.mo_costo) || 0) * tasa : 0;
+  const totalBs = Number(registro.costo_bolivares) || (tasa > 0 ? (Number(registro.costo_total) || 0) * tasa : 0);
+
+  // Bolívares directos (no convierten a USD)
+  const bsDirectoPiezas = Number(registro.precio_bs_repuestos) || 0;
+  const bsDirectoMano = Number(registro.precio_bs_mano_obra) || 0;
+  const totalBsDirecto = bsDirectoPiezas + bsDirectoMano;
+
+  // Gran total desembolsado en Bolívares (convertidos + directos)
+  const totalDesembolsoBs = totalBs + totalBsDirecto;
+
+  // Abono y saldo
+  const abono = Number(registro.abono) || 0;
+  const saldo = (Number(registro.costo_total) || 0) - abono;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
       onClick={onClose}
     >
       {/* Fondo blur */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
 
       {/* Panel */}
       <div
-        className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#0e0e1a] shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-lg rounded-3xl border border-white/10 bg-[#0e0e1a] shadow-2xl overflow-hidden my-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glow decorativo */}
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full bg-violet-600/20 blur-3xl pointer-events-none" />
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-44 w-44 rounded-full bg-violet-600/20 blur-3xl pointer-events-none" />
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
@@ -87,15 +104,23 @@ function DetalleModal({
             </div>
             <div>
               <h2 className="text-sm font-bold text-white">Detalle del Mantenimiento</h2>
-              <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                <CalendarDays className="h-3 w-3" />
-                {formatDate(registro.fecha)}
+              <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3" />
+                  {formatDate(registro.fecha)}
+                </span>
                 {registro.proveedor && (
-                  <span className="ml-2 flex items-center gap-1">
-                    <Store className="h-3 w-3" /> {registro.proveedor}
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <Store className="h-3 w-3 text-slate-500" /> {registro.proveedor}
                   </span>
                 )}
-              </p>
+                {tasa > 0 && (
+                  <span className="flex items-center gap-1 font-mono text-[11px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                    <ArrowRightLeft className="h-2.5 w-2.5" />
+                    1 USD = {formatBs(tasa)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -107,83 +132,253 @@ function DetalleModal({
         </div>
 
         {/* Contenido */}
-        <div className="px-6 py-5 space-y-4">
-          {/* Pieza / Repuesto */}
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-              <Package className="h-3.5 w-3.5" /> Pieza / Repuesto
-            </p>
-            <div className="grid grid-cols-2 gap-y-1 text-xs">
-              <span className="text-slate-500">Nombre</span>
-              <span className="text-white font-medium text-right">{registro.rep_concepto}</span>
-              <span className="text-slate-500">Cantidad</span>
-              <span className="text-white font-medium text-right">{registro.rep_cantidad}</span>
-              <span className="text-slate-500">Costo unitario</span>
-              <span className="text-white font-medium text-right">{formatUSD(registro.rep_costo_unitario)}</span>
-              <span className="text-slate-500 font-semibold">Subtotal ($)</span>
-              <span className="text-amber-300 font-bold text-right">{formatUSD(registro.rep_subtotal)}</span>
+        <div className="px-6 py-5 space-y-4 max-h-[calc(85vh-120px)] overflow-y-auto">
+          {/* ── Pieza / Repuesto ── */}
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
+                <Package className="h-3.5 w-3.5" /> Pieza / Repuesto
+              </p>
+              {registro.rep_subtotal > 0 && (
+                <span className="font-mono text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                  Subtotal: {formatUSD(registro.rep_subtotal)}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-1.5">
+                <span className="text-slate-400">Nombre / Ítems:</span>
+                <span className="text-white font-medium text-right max-w-[65%]">{registro.rep_concepto || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                <span className="text-slate-400">Cantidad total:</span>
+                <span className="text-white font-medium font-mono">{registro.rep_cantidad}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                <span className="text-slate-400">Costo unitario ($):</span>
+                <span className="text-white font-medium font-mono">{formatUSD(registro.rep_costo_unitario)}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                <span className="text-slate-300 font-semibold">Subtotal en Dólares ($):</span>
+                <span className="text-amber-300 font-bold font-mono text-sm">{formatUSD(registro.rep_subtotal)}</span>
+              </div>
+
+              {/* Bolívares convertidos de repuestos */}
               {repBs > 0 && (
-                <>
-                  <span className="text-amber-400/80 font-semibold">Monto en Bs</span>
-                  <span className="text-amber-200 font-bold font-mono text-right">
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-amber-400/80">Equivalente en Bs (Tasa {tasa.toFixed(2)}):</span>
+                  <span className="text-amber-200 font-bold font-mono">
                     {formatBs(repBs)}
                   </span>
-                </>
+                </div>
+              )}
+
+              {/* Bolívares directos de repuestos */}
+              {bsDirectoPiezas > 0 && (
+                <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-2.5 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-300 font-semibold flex items-center gap-1">
+                      <Banknote className="h-3.5 w-3.5 text-purple-400" />
+                      Precio Bs Directo (Piezas):
+                    </span>
+                    <span className="text-purple-200 font-bold font-mono text-sm">
+                      {formatBs(bsDirectoPiezas)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-purple-300/70">
+                    <span>{registro.rep_cantidad > 1 ? `Unitario directo: ${formatBs(bsDirectoPiezas / registro.rep_cantidad)} c/u` : "Monto total directo"}</span>
+                    <span className="italic">Pago directo en Bs (no afecta USD)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Total consolidado en Bs de repuestos si ambos aplican */}
+              {repBs > 0 && bsDirectoPiezas > 0 && (
+                <div className="flex items-center justify-between pt-1 font-semibold text-slate-300">
+                  <span>Total Repuestos en Bs (Convertido + Directo):</span>
+                  <span className="font-mono text-amber-300">{formatBs(repBs + bsDirectoPiezas)}</span>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Mano de Obra */}
-          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4 space-y-2">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-400">
-              <Hammer className="h-3.5 w-3.5" /> Mano de Obra
-            </p>
-            <div className="grid grid-cols-2 gap-y-1 text-xs">
-              <span className="text-slate-500">Concepto</span>
-              <span className="text-white font-medium text-right">{registro.mo_concepto}</span>
-              <span className="text-slate-500 font-semibold">Costo ($)</span>
-              <span className="text-orange-300 font-bold text-right">{formatUSD(registro.mo_costo)}</span>
+          {/* ── Mano de Obra ── */}
+          <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-400">
+                <Hammer className="h-3.5 w-3.5" /> Mano de Obra
+              </p>
+              {registro.mo_costo > 0 && (
+                <span className="font-mono text-xs font-bold text-orange-300 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-md">
+                  Subtotal: {formatUSD(registro.mo_costo)}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-1.5">
+                <span className="text-slate-400">Descripción:</span>
+                <span className="text-white font-medium text-right max-w-[65%]">{registro.mo_concepto || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                <span className="text-slate-300 font-semibold">Costo en Dólares ($):</span>
+                <span className="text-orange-300 font-bold font-mono text-sm">{formatUSD(registro.mo_costo)}</span>
+              </div>
+
+              {/* Bolívares convertidos de mano de obra */}
               {moBs > 0 && (
-                <>
-                  <span className="text-orange-400/80 font-semibold">Monto en Bs</span>
-                  <span className="text-orange-200 font-bold font-mono text-right">
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-orange-400/80">Equivalente en Bs (Tasa {tasa.toFixed(2)}):</span>
+                  <span className="text-orange-200 font-bold font-mono">
                     {formatBs(moBs)}
                   </span>
-                </>
+                </div>
+              )}
+
+              {/* Bolívares directos de mano de obra */}
+              {bsDirectoMano > 0 && (
+                <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-2.5 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-300 font-semibold flex items-center gap-1">
+                      <Banknote className="h-3.5 w-3.5 text-purple-400" />
+                      Precio Bs Directo (Mano de Obra):
+                    </span>
+                    <span className="text-purple-200 font-bold font-mono text-sm">
+                      {formatBs(bsDirectoMano)}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-purple-300/70 italic text-right">
+                    Pago directo en Bs (no afecta USD)
+                  </div>
+                </div>
+              )}
+
+              {/* Total consolidado en Bs de mano de obra si ambos aplican */}
+              {moBs > 0 && bsDirectoMano > 0 && (
+                <div className="flex items-center justify-between pt-1 font-semibold text-slate-300">
+                  <span>Total M.O. en Bs (Convertido + Directo):</span>
+                  <span className="font-mono text-orange-300">{formatBs(moBs + bsDirectoMano)}</span>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Total */}
-          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 space-y-2">
+          {/* ── Total General y Desglose Financiero ── */}
+          <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4 space-y-3">
+            {/* Total USD */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-violet-400/80">
-                <Calculator className="h-3.5 w-3.5" />
-                <span>
-                  {formatUSD(registro.rep_subtotal)} + {formatUSD(registro.mo_costo)}
+              <div className="flex items-center gap-2 text-xs text-violet-300">
+                <Calculator className="h-4 w-4 text-violet-400" />
+                <span className="font-semibold uppercase tracking-wider">
+                  Total Mantenimiento (USD)
                 </span>
               </div>
-              <span className="font-mono text-base font-bold text-violet-300">
+              <span className="font-mono text-lg font-bold text-violet-200">
                 {formatUSD(registro.costo_total)}
               </span>
             </div>
-            {totalBs > 0 && (
-              <div className="flex items-center justify-between border-t border-violet-500/20 pt-2">
-                <span className="text-xs text-cyan-400/80">
-                  Total en Bs {tasa > 0 ? `(× ${tasa.toFixed(2)})` : ""}
-                </span>
-                <span className="font-mono text-sm font-bold text-cyan-300">
-                  {formatBs(totalBs)}
-                </span>
-              </div>
-            )}
+
+            <div className="text-[11px] text-slate-400 flex items-center justify-between border-t border-violet-500/20 pt-2">
+              <span>Fórmula en Dólares ($):</span>
+              <span className="font-mono text-slate-300">
+                Piezas: <strong className="text-amber-300">{formatUSD(registro.rep_subtotal)}</strong> + M.O.: <strong className="text-orange-300">{formatUSD(registro.mo_costo)}</strong>
+              </span>
+            </div>
+
+            {/* Desglose en Bolívares */}
+            <div className="space-y-2 border-t border-violet-500/20 pt-2 text-xs">
+              {totalBs > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-cyan-400/90 flex items-center gap-1">
+                    <ArrowRightLeft className="h-3 w-3 text-cyan-400" />
+                    Bolívares por Conversión (USD × Tasa):
+                  </span>
+                  <span className="font-mono font-bold text-cyan-300 text-sm">
+                    {formatBs(totalBs)}
+                  </span>
+                </div>
+              )}
+
+              {totalBsDirecto > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-purple-300 flex items-center gap-1">
+                    <Banknote className="h-3 w-3 text-purple-400" />
+                    Bolívares Directos (Sin conv. a $):
+                  </span>
+                  <span className="font-mono font-bold text-purple-300 text-sm">
+                    {formatBs(totalBsDirecto)}
+                  </span>
+                </div>
+              )}
+
+              {/* Desglose de bolívares directos si hay piezas y MO */}
+              {bsDirectoPiezas > 0 && bsDirectoMano > 0 && (
+                <div className="flex items-center justify-end text-[11px] text-purple-400/80 font-mono gap-2">
+                  <span>(Piezas: {formatBs(bsDirectoPiezas)}</span>
+                  <span>+ M.O.: {formatBs(bsDirectoMano)})</span>
+                </div>
+              )}
+
+              {/* Total Desembolso en Bolívares */}
+              {totalBsDirecto > 0 && totalBs > 0 && (
+                <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between mt-1">
+                  <div>
+                    <span className="text-xs font-bold text-cyan-200 block">
+                      Total Desembolso en Bolívares:
+                    </span>
+                    <span className="text-[10px] text-cyan-400/70">
+                      Convertidos ({formatBs(totalBs)}) + Directos ({formatBs(totalBsDirecto)})
+                    </span>
+                  </div>
+                  <span className="font-mono text-base font-extrabold text-cyan-300">
+                    {formatBs(totalDesembolsoBs)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Notas */}
           {registro.notas && (
-            <p className="text-xs text-slate-400 italic border-l-2 border-slate-700 pl-3">
-              {registro.notas}
-            </p>
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">Notas / Observaciones:</span>
+              <p className="text-xs text-slate-300 italic">
+                {registro.notas}
+              </p>
+            </div>
+          )}
+
+          {/* Abono y Saldo */}
+          {abono > 0 && (
+            <div className={`rounded-2xl border p-4 space-y-2 ${
+              saldo <= 0
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : "border-amber-500/30 bg-amber-500/10"
+            }`}>
+              <p className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                saldo <= 0 ? "text-emerald-400" : "text-amber-400"
+              }`}>
+                <DollarSign className="h-3.5 w-3.5" />
+                {saldo <= 0 ? "✅ Cancelado" : "⏳ Pago Parcial"}
+              </p>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-slate-400">Total del mantenimiento:</span>
+                  <span className="font-mono font-bold text-violet-300">{formatUSD(registro.costo_total)}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-slate-400">Abono recibido:</span>
+                  <span className="font-mono font-bold text-green-300">− {formatUSD(abono)}</span>
+                </div>
+                <div className={`flex items-center justify-between pt-1 font-semibold ${
+                  saldo <= 0 ? "text-emerald-300" : "text-amber-300"
+                }`}>
+                  <span>{saldo <= 0 ? "Saldo:" : "Saldo pendiente:"}</span>
+                  <span className="font-mono text-sm">{saldo <= 0 ? formatUSD(0) : formatUSD(saldo)}</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
@@ -300,6 +495,32 @@ export function MantenimientoTable({ registros }: MantenimientoTableProps) {
                       {formatBs(totalBs)}
                     </span>
                   )}
+                  {((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0)) > 0 && (
+                    <span className="font-mono text-[10px] text-purple-300 block font-semibold" title="Bolívares directos">
+                      +{formatBs((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0))} Bs
+                    </span>
+                  )}
+                  {/* Indicador de abono y saldo */}
+                  {(Number(r.abono) || 0) > 0 && (() => {
+                    const rAbono = Number(r.abono) || 0;
+                    const rSaldo = r.costo_total - rAbono;
+                    return (
+                      <>
+                        <span className="font-mono text-[10px] text-green-400 block font-semibold">
+                          Abono: {formatUSD(rAbono)}
+                        </span>
+                        {rSaldo > 0 ? (
+                          <span className="font-mono text-[10px] text-amber-400 block font-bold">
+                            Debe: {formatUSD(rSaldo)}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-[10px] text-emerald-400 block font-bold">
+                            ✓ Cancelado
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Acciones */}

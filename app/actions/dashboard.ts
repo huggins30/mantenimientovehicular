@@ -181,25 +181,40 @@ export async function getDashboardData(
         0),
     0
   );
-  const totalIngresos =
+  // Gastos en Bs directos (NO convertidos a USD)
+  const totalGastosBsDirecto = registrosMantenimiento.reduce((sum, r) =>
+    sum + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0
+  );
+
+  // monto_ingreso ya tiene las deducciones de operador/colector aplicadas (factor 0.7675)
+  // Ingresos en Bs: neto tras compra de divisas. NO se restan gastos directos en Bs.
+  const totalIngresosBolivaresBruto =
     ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
     totalBsUsadosCompras;
+
+  // totalIngresosBolivares = ingreso disponible en Bs (sin restar gastos directos en Bs)
+  const totalIngresosBolivares = totalIngresosBolivaresBruto;
+  const totalIngresos = totalIngresosBolivares;
+
   const totalIngresosDolares =
     ingresos.reduce(
       (sum, i) => sum + (Number(i.dolares) || 0),
       0
     ) + totalDolaresComprados;
-  // monto_ingreso ya tiene las deducciones de operador/colector aplicadas (factor 0.7675)
-  // Es el "Ingreso Registrado" neto que el usuario ve en cada registro
-  const totalIngresosBolivares =
-    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
-    totalBsUsadosCompras;
-  // Los gastos de mantenimiento (repuesto + mano de obra) ya vienen unidos en costo_total
-  const totalGastosMantenimiento = registrosMantenimiento.reduce(
-    (sum, r) => sum + (r.costo_total ?? 0),
+
+  // Los gastos de mantenimiento se separan en repuestos y mano de obra
+  const totalGastosRepuestos = registrosMantenimiento.reduce(
+    (sum, r) => sum + ((r as any).rep_subtotal ?? 0),
     0
   );
+  const totalManoObra = registrosMantenimiento.reduce(
+    (sum, r) => sum + (Number(r.mo_costo) || 0),
+    0
+  );
+  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra;
   const totalGastosRepuestosBs = registrosMantenimiento.reduce((sum, r) => {
+    const directBs = (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0);
+    if (directBs > 0) return sum + directBs;
     if (r.costo_bolivares) return sum + Number(r.costo_bolivares);
     if (r.tasa_cambio && r.costo_total) return sum + (Number(r.costo_total) * Number(r.tasa_cambio));
     return sum;
@@ -212,20 +227,35 @@ export async function getDashboardData(
   const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
   const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
   const rentabilidadNeta = rentabilidadDolares;
+  // Rentabilidad en Bs: Ingresos Bs − Gastos directos en Bs
+  const rentabilidadBsDirecta = totalIngresosBolivares - totalGastosBsDirecto;
+
+  // Saldo pendiente por pagar: SOLO de registros donde se ingresó un abono (abono > 0) y costo_total > abono
+  const totalSaldoPendiente = registrosMantenimiento.reduce((sum, r) => {
+    const abono = Number(r.abono) || 0;
+    if (abono <= 0) return sum;
+    const costo = Number(r.costo_total) || 0;
+    const pendiente = costo - abono;
+    return sum + (pendiente > 0 ? pendiente : 0);
+  }, 0);
 
   const financialSummary: FinancialSummary = {
     totalIngresos,
     totalIngresosDolares,
     totalIngresosBolivares,
-    totalGastosRepuestos: totalGastosMantenimiento,
+    totalIngresosBolivaresBruto,
+    totalGastosRepuestos,
     totalGastosRepuestosBs,
     totalMantenimientoAceite,
-    totalManoObra: 0,
+    totalManoObra,
     rentabilidadDolares,
     rentabilidadBolivares,
     rentabilidadNeta,
     totalDolaresComprados,
     totalBsUsadosCompras,
+    totalGastosBsDirecto,
+    rentabilidadBsDirecta,
+    totalSaldoPendiente,
   };
 
   // ---- Estado del semáforo de aceite ----
@@ -309,6 +339,7 @@ export interface ResumenPorUnidad {
   totalIngresos: number;
   totalIngresosDolares: number;
   totalIngresosBolivares: number;
+  totalIngresosBolivaresBruto?: number;
   totalGastosRepuestos: number;
   totalGastosRepuestosBs: number;
   totalMantenimientoAceite: number;
@@ -318,6 +349,12 @@ export interface ResumenPorUnidad {
   rentabilidadNeta: number;
   totalDolaresComprados?: number;
   totalBsUsadosCompras?: number;
+  /** Total de gastos en Bs directos (precio_bs_repuestos + precio_bs_mano_obra) */
+  totalGastosBsDirecto?: number;
+  /** Rentabilidad Bs directa = Ingresos Bs - Gastos Bs directos */
+  rentabilidadBsDirecta?: number;
+  /** Saldo pendiente por pagar ($) */
+  totalSaldoPendiente?: number;
 }
 
 export async function getGlobalDashboardData(filter?: DashboardDateFilter): Promise<{
@@ -344,7 +381,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso, dolares, pago_movil, movi, efectivo, otros, fecha").eq("user_id", user.id),
     supabase.from("ingresos_diarios_f").select("unidad_id, monto_ingreso, dolares, pago_movil, efectivo, otros, gastos, fecha").eq("user_id", user.id),
     supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio, fecha_servicio").eq("user_id", user.id),
-    supabase.from("registros_mantenimiento").select("unidad_id, costo_total, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
+    supabase.from("registros_mantenimiento").select("unidad_id, costo_total, rep_subtotal, mo_costo, costo_bolivares, tasa_cambio, fecha, precio_bs_repuestos, precio_bs_mano_obra, abono").eq("user_id", user.id),
     supabase.from("compras_dolares").select("unidad_id, cantidad_dolares, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
   ]);
 
@@ -376,28 +413,53 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
         0),
     0
   );
-  const totalIngresos =
+
+  // Gastos en Bs directos (NO convertidos a USD)
+  const totalGastosBsDirecto = registrosMantenimiento.reduce((sum, r) =>
+    sum + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0
+  );
+
+  // monto_ingreso ya tiene las deducciones de operador/colector (factor 0.7675)
+  // Ingresos en Bs: neto tras compra de divisas. NO se restan gastos directos en Bs.
+  const totalIngresosBolivaresBruto =
     ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
     totalBsUsadosCompras;
+
+  // totalIngresosBolivares = ingreso disponible en Bs (sin restar gastos directos en Bs)
+  const totalIngresosBolivares = totalIngresosBolivaresBruto;
+  const totalIngresos = totalIngresosBolivares;
+
   const totalIngresosDolares =
     ingresos.reduce((sum, i) => sum + (Number(i.dolares) || 0), 0) +
     totalDolaresComprados;
-  // monto_ingreso ya tiene las deducciones de operador/colector (factor 0.7675)
-  const totalIngresosBolivares =
-    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
-    totalBsUsadosCompras;
-  const totalGastosRepuestos = registrosMantenimiento.reduce((sum, r) => sum + (r.costo_total ?? 0), 0);
+
+  const totalGastosRepuestos = registrosMantenimiento.reduce((sum, r) => sum + ((r as any).rep_subtotal ?? 0), 0);
+  const totalManoObra = registrosMantenimiento.reduce((sum, r) => sum + ((r as any).mo_costo ?? 0), 0);
+  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra;
   const totalGastosRepuestosBs = registrosMantenimiento.reduce((sum, r) => {
+    const directBs = (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0);
+    if (directBs > 0) return sum + directBs;
     if (r.costo_bolivares) return sum + Number(r.costo_bolivares);
     if (r.tasa_cambio && r.costo_total) return sum + (Number(r.costo_total) * Number(r.tasa_cambio));
     return sum;
   }, 0);
   const totalMantenimientoAceite = mantenimientos.reduce((sum, m) => sum + (m.costo_servicio ?? 0), 0);
-  const totalManoObra = 0; // ahora está incluido en totalGastosRepuestos
-  
-  const rentabilidadDolares = totalIngresosDolares - totalGastosRepuestos;
+
+  // Rentabilidad global en USD = Ingresos$ − (Repuestos$ + Mano de Obra$)
+  const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
   const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
   const rentabilidadNeta = rentabilidadDolares;
+  // Rentabilidad en Bs: Ingresos Bs − Gastos directos en Bs
+  const rentabilidadBsDirecta = totalIngresosBolivares - totalGastosBsDirecto;
+
+  // Total saldo pendiente por pagar global: SOLO de registros con abono > 0 y costo_total > abono
+  const totalSaldoPendiente = registrosMantenimiento.reduce((sum, r) => {
+    const abono = Number(r.abono) || 0;
+    if (abono <= 0) return sum;
+    const costo = Number(r.costo_total) || 0;
+    const pendiente = costo - abono;
+    return sum + (pendiente > 0 ? pendiente : 0);
+  }, 0);
 
   // Desglose por unidad
   const resumenPorUnidad: ResumenPorUnidad[] = unidades.map((u) => {
@@ -416,25 +478,49 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
             0),
         0
       );
-    const uIngresos =
+    // Gastos en Bs directos por unidad (NO convertidos)
+    const uGastosBsDirecto = registrosMantenimiento
+      .filter((r) => r.unidad_id === uid)
+      .reduce((s, r) => s + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0);
+
+    const uIngresosBolivaresBruto =
       uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0) -
       uBsUsadosCompras;
+
+    // Ingresos Bs por unidad: neto tras compra divisas. NO se restan gastos directos.
+    const uIngresosBolivares = uIngresosBolivaresBruto;
+    const uIngresos = uIngresosBolivares;
+
     const uIngresosDolares =
       uIngresosList.reduce((s, i) => s + (Number(i.dolares) || 0), 0) +
       uDolaresComprados;
-    // monto_ingreso ya tiene deducciones de operador/colector
-    const uIngresosBolivares =
-      uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0) -
-      uBsUsadosCompras;
-    const uGastos = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + (r.costo_total ?? 0), 0);
+
+    const uGastos = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + ((r as any).rep_subtotal ?? 0), 0);
+    const uManoObra = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + ((r as any).mo_costo ?? 0), 0);
     const uGastosBs = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => {
+      const directBs = (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0);
+      if (directBs > 0) return s + directBs;
       if (r.costo_bolivares) return s + Number(r.costo_bolivares);
       if (r.tasa_cambio && r.costo_total) return s + (Number(r.costo_total) * Number(r.tasa_cambio));
       return s;
     }, 0);
     const uAceite = mantenimientos.filter((m) => m.unidad_id === uid).reduce((s, m) => s + (m.costo_servicio ?? 0), 0);
-    const uRentabilidadDolares = uIngresosDolares - uGastos;
+    // Rentabilidad $ por unidad = Ingresos$ − (Repuestos$ + Mano de Obra$)
+    const uRentabilidadDolares = uIngresosDolares - (uGastos + uManoObra);
     const uRentabilidadBolivares = uIngresosBolivares - uGastosBs;
+    // Rentabilidad en Bs por unidad: Ingresos Bs − Gastos directos en Bs
+    const uRentabilidadBsDirecta = uIngresosBolivares - uGastosBsDirecto;
+
+    // Saldo pendiente por pagar por unidad: SOLO de registros con abono > 0 y costo_total > abono
+    const uSaldoPendiente = registrosMantenimiento
+      .filter((r) => r.unidad_id === uid)
+      .reduce((s, r) => {
+        const abono = Number(r.abono) || 0;
+        if (abono <= 0) return s;
+        const costo = Number(r.costo_total) || 0;
+        const pendiente = costo - abono;
+        return s + (pendiente > 0 ? pendiente : 0);
+      }, 0);
 
     return {
       unidad_id: uid,
@@ -445,15 +531,19 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalIngresos: uIngresos,
       totalIngresosDolares: uIngresosDolares,
       totalIngresosBolivares: uIngresosBolivares,
+      totalIngresosBolivaresBruto: uIngresosBolivaresBruto,
       totalGastosRepuestos: uGastos,
       totalGastosRepuestosBs: uGastosBs,
       totalMantenimientoAceite: uAceite,
-      totalManoObra: 0,
+      totalManoObra: uManoObra,
       rentabilidadDolares: uRentabilidadDolares,
       rentabilidadBolivares: uRentabilidadBolivares,
       rentabilidadNeta: uRentabilidadDolares,
       totalDolaresComprados: uDolaresComprados,
       totalBsUsadosCompras: uBsUsadosCompras,
+      totalGastosBsDirecto: uGastosBsDirecto,
+      rentabilidadBsDirecta: uRentabilidadBsDirecta,
+      totalSaldoPendiente: uSaldoPendiente,
     };
   });
 
@@ -463,6 +553,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalIngresos,
       totalIngresosDolares,
       totalIngresosBolivares,
+      totalIngresosBolivaresBruto,
       totalGastosRepuestos,
       totalGastosRepuestosBs,
       totalMantenimientoAceite,
@@ -472,6 +563,9 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       rentabilidadNeta,
       totalDolaresComprados,
       totalBsUsadosCompras,
+      totalGastosBsDirecto,
+      rentabilidadBsDirecta,
+      totalSaldoPendiente,
     },
     resumenPorUnidad,
   };

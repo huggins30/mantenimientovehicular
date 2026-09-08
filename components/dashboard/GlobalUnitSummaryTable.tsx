@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Hammer,
   Banknote,
+  AlertCircle,
 } from "lucide-react";
 import type { ResumenPorUnidad } from "@/app/actions/dashboard";
 
@@ -78,6 +79,13 @@ function ReporteModal({
       bar: row.totalGastosRepuestos,
     },
     {
+      label: "Gastos en Bs (Directo)",
+      valueText: formatBs(row.totalGastosBsDirecto ?? 0),
+      color: "purple",
+      icon: Banknote,
+      bar: row.totalGastosBsDirecto ?? 0,
+    },
+    {
       label: "Cambios de Aceite",
       valueText: formatUSD(row.totalMantenimientoAceite),
       color: "amber",
@@ -95,6 +103,8 @@ function ReporteModal({
 
   const maxBar = Math.max(
     row.totalIngresosDolares ?? 0,
+    row.totalIngresosBolivares ?? 0,
+    row.totalGastosBsDirecto ?? 0,
     totalGastos,
     1
   );
@@ -102,6 +112,7 @@ function ReporteModal({
   const colorMap: Record<string, string> = {
     emerald: "bg-emerald-500",
     cyan: "bg-cyan-500",
+    purple: "bg-purple-500",
     red: "bg-red-500",
     amber: "bg-amber-500",
     orange: "bg-orange-500",
@@ -109,6 +120,7 @@ function ReporteModal({
   const textMap: Record<string, string> = {
     emerald: "text-emerald-300",
     cyan: "text-cyan-300",
+    purple: "text-purple-300",
     red: "text-red-300",
     amber: "text-amber-300",
     orange: "text-orange-300",
@@ -216,15 +228,47 @@ function ReporteModal({
             </div>
           </div>
 
-          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-center">
-            <p className="text-[11px] text-slate-400 mb-0.5">Rentabilidad Neta en Bolívares (Bs)</p>
-            <p className={`font-mono text-base font-bold ${
-              (row.rentabilidadBolivares ?? 0) >= 0 ? "text-cyan-300" : "text-red-300"
-            }`}>
-              {(row.rentabilidadBolivares ?? 0) >= 0 ? "+" : ""}
-              {formatBs(row.rentabilidadBolivares ?? 0)}
-            </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-center">
+              <p className="text-[11px] text-slate-400 mb-0.5">Rentabilidad Bolívares (Tasa)</p>
+              <p className={`font-mono text-sm font-bold ${
+                (row.rentabilidadBolivares ?? 0) >= 0 ? "text-cyan-300" : "text-red-300"
+              }`}>
+                {(row.rentabilidadBolivares ?? 0) >= 0 ? "+" : ""}
+                {formatBs(row.rentabilidadBolivares ?? 0)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-2.5 text-center">
+              <p className="text-[11px] text-slate-400 mb-0.5">Rentabilidad en Bs (Ing − Gto Bs)</p>
+              <p className={`font-mono text-sm font-bold ${
+                (row.rentabilidadBsDirecta ?? 0) >= 0 ? "text-purple-300" : "text-red-300"
+              }`}>
+                {(row.rentabilidadBsDirecta ?? 0) >= 0 ? "+" : ""}
+                {formatBs(row.rentabilidadBsDirecta ?? 0)}
+              </p>
+            </div>
           </div>
+
+          {/* Saldo pendiente por pagar */}
+          {(row.totalSaldoPendiente ?? 0) > 0 ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-xs font-semibold text-amber-300">
+                  Saldo pendiente por pagar (mantenimientos):
+                </span>
+              </div>
+              <span className="font-mono text-sm font-bold text-amber-300">
+                {formatUSD(row.totalSaldoPendiente ?? 0)}
+              </span>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 flex items-center justify-between text-xs text-emerald-400">
+              <span>Saldos de mantenimiento:</span>
+              <span className="font-bold font-mono">✅ Al día ($0.00)</span>
+            </div>
+          )}
 
           {/* Resumen Ingresos $ y Bs */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-2">
@@ -380,6 +424,11 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                         <BarChart2 className="h-3.5 w-3.5" />
                         Ver
                       </button>
+                      {(row.totalSaldoPendiente ?? 0) > 0 && (
+                        <span className="block mt-1 font-mono text-[10px] text-amber-400 font-bold" title="Saldo pendiente de pago">
+                          Debe: {formatUSD(row.totalSaldoPendiente ?? 0)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -443,7 +492,17 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                     })()}
                   </div>
                 </td>
-                <td className="px-5 py-4" />
+                <td className="px-5 py-4 text-center">
+                  {(() => {
+                    const totPendiente = resumen.reduce((s, r) => s + (r.totalSaldoPendiente ?? 0), 0);
+                    if (totPendiente <= 0) return null;
+                    return (
+                      <span className="inline-block font-mono text-[10px] text-amber-300 font-bold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20" title="Total deuda flota">
+                        Debe: {formatUSD(totPendiente)}
+                      </span>
+                    );
+                  })()}
+                </td>
               </tr>
             </tfoot>
           </table>

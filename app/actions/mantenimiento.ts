@@ -37,8 +37,16 @@ export async function registrarMantenimientoAction(
   const moCostoUSD     = Number(formData.get("mo_costo") || 0);
   const moCostoBs      = Number(formData.get("mo_costo_bs") || 0);
 
-  // ── Tasa de Cambio ──────────────────────────────────────
-  const tasaCambio     = Number(formData.get("tasa_cambio"));
+  // ── Tasa de Cambio (ahora solo informativa, no afecta el cálculo) ────────
+  const tasaCambioRaw  = formData.get("tasa_cambio");
+  const tasaCambio     = tasaCambioRaw ? Number(tasaCambioRaw) : null;
+
+  // ── Precio en Bs DIRECTO (no se convierte a USD) ──────────────────────
+  let precioBsRepuestos = Number(formData.get("precio_bs_repuestos") || 0);
+  let precioBsManoObra  = Number(formData.get("precio_bs_mano_obra") || formData.get("mo_precio_bs") || 0);
+
+  // ── Abono (adelanto pagado, en USD) ─────────────────────────────────────
+  const abono = Math.max(0, Number(formData.get("abono") || 0));
 
   // ── Validaciones Generales ──────────────────────────────
   if (!fecha)
@@ -49,8 +57,6 @@ export async function registrarMantenimientoAction(
     return { success: false, error: "El costo de mano de obra en dólares no puede ser negativo." };
   if (isNaN(moCostoBs) || moCostoBs < 0)
     return { success: false, error: "El costo de mano de obra en bolívares no puede ser negativo." };
-  if (isNaN(tasaCambio) || tasaCambio <= 0)
-    return { success: false, error: "La tasa de cambio debe ser mayor a 0." };
 
   let repSubtotalUSD = 0;
 
@@ -61,6 +67,7 @@ export async function registrarMantenimientoAction(
         cantidad: number | string;
         costoUSD: string;
         costoBs: string;
+        precioBsDirecto?: string;
       }>;
 
       if (piezasList.length > 0) {
@@ -78,19 +85,28 @@ export async function registrarMantenimientoAction(
         repConcepto = nombresValidos.join(", ");
         let totalCount = 0;
         let totalUSD = 0;
+        let totalBsDirectoFromItems = 0;
 
         for (const p of piezasList) {
           if (!p.concepto.trim()) continue;
           const cant = Math.max(1, parseInt(String(p.cantidad)) || 1);
           const cUSD = parseFloat(p.costoUSD) || 0;
           const cBs = parseFloat(p.costoBs) || 0;
-          const unitUSD = cUSD + (tasaCambio > 0 && cBs > 0 ? cBs / tasaCambio : 0);
+          const cBsDir = parseFloat(p.precioBsDirecto || "") || 0;
+          // Solo el costo USD afecta el total en dólares (Bs ya no se convierte)
+          const unitUSD = cUSD;
           totalUSD += cant * unitUSD;
           totalCount += cant;
+          totalBsDirectoFromItems += cant * cBsDir;
         }
 
         repCantidad = totalCount > 0 ? totalCount : 1;
         repSubtotalUSD = totalUSD;
+
+        // Si no vino por formData o si vino en 0 pero los items tienen valor
+        if (precioBsRepuestos <= 0 && totalBsDirectoFromItems > 0) {
+          precioBsRepuestos = totalBsDirectoFromItems;
+        }
       }
     } catch {
       // Si falla el parse, continuará con los campos individuales
@@ -108,14 +124,14 @@ export async function registrarMantenimientoAction(
     if (isNaN(repCostoUnitBs) || repCostoUnitBs < 0)
       return { success: false, error: "El costo del repuesto en bolívares no puede ser negativo." };
 
-    const repUnitUSD = repCostoUnitUSD + (tasaCambio > 0 && repCostoUnitBs > 0 ? repCostoUnitBs / tasaCambio : 0);
+    const repUnitUSD = repCostoUnitUSD; // Solo USD, sin conversión de Bs
     repSubtotalUSD = repCantidad * repUnitUSD;
   }
 
-  // Conversión de Mano de Obra
-  const moUSD = moCostoUSD + (tasaCambio > 0 && moCostoBs > 0 ? moCostoBs / tasaCambio : 0);
+  // Mano de Obra en USD: solo el monto USD directo
+  const moUSD = moCostoUSD;
 
-  if (repSubtotalUSD <= 0 && moUSD <= 0) {
+  if (repSubtotalUSD <= 0 && moUSD <= 0 && precioBsRepuestos <= 0 && precioBsManoObra <= 0) {
     return { success: false, error: "Debe ingresar un monto en dólares o bolívares para las piezas o la mano de obra." };
   }
 
@@ -123,7 +139,7 @@ export async function registrarMantenimientoAction(
 
   // ── Insertar registro unificado ─────────────────────────
   const totalCostoUSD  = repSubtotalUSD + moUSD;
-  const costoBolivares = tasaCambio > 0 ? Number((totalCostoUSD * tasaCambio).toFixed(2)) : null;
+  const costoBolivares = tasaCambio && tasaCambio > 0 ? Number((totalCostoUSD * tasaCambio).toFixed(2)) : null;
 
   const { data, error } = await supabase
     .from("registros_mantenimiento")
@@ -136,10 +152,13 @@ export async function registrarMantenimientoAction(
       rep_costo_unitario: Number(repUnitUSD.toFixed(2)),
       mo_concepto:       moConcepto,
       mo_costo:          Number(moUSD.toFixed(2)),
-      tasa_cambio:       tasaCambio,
+      tasa_cambio:       tasaCambio ?? null,
       costo_bolivares:   costoBolivares,
       proveedor:         proveedor || null,
       notas:             notas || null,
+      precio_bs_repuestos: precioBsRepuestos > 0 ? Number(precioBsRepuestos.toFixed(2)) : 0,
+      precio_bs_mano_obra: precioBsManoObra > 0 ? Number(precioBsManoObra.toFixed(2)) : 0,
+      abono:               abono > 0 ? Number(abono.toFixed(2)) : 0,
     })
     .select()
     .single();

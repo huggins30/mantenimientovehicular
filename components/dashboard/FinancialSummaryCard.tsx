@@ -10,8 +10,8 @@ interface FinancialSummaryCardProps {
   title: string;
   amount: number;
   icon: LucideIcon;
-  /** Paleta de colores: income | expense | maintenance | labor | profit */
-  variant: "income" | "expense" | "maintenance" | "labor" | "profit";
+  /** Paleta de colores: income | expense | maintenance | labor | profit | debt */
+  variant: "income" | "expense" | "maintenance" | "labor" | "profit" | "debt";
   subtitle?: string;
   currency?: "USD" | "BS" | "PEN";
   badgeText?: string;
@@ -67,6 +67,15 @@ const variantConfig = {
     amountColor: "text-violet-400",
     badge: "bg-violet-500/20 text-violet-300",
     badgeText: "Neto",
+  },
+  debt: {
+    gradient: "from-rose-500/20 to-amber-600/10",
+    border: "border-rose-500/30",
+    iconBg: "bg-rose-500/20",
+    iconColor: "text-rose-400",
+    amountColor: "text-rose-300",
+    badge: "bg-rose-500/20 text-rose-300",
+    badgeText: "Por Pagar",
   },
 };
 
