@@ -17,6 +17,9 @@ import {
   Banknote,
   DollarSign,
   AlertCircle,
+  Coins,
+  Wallet,
+  ArrowRightLeft,
 } from "lucide-react";
 import { getDashboardData, getGlobalDashboardData, getUnidadesUsuario } from "@/app/actions/dashboard";
 import { createSupabaseServerClient } from "@/lib/supabase";
@@ -806,24 +809,102 @@ export default async function DashboardPage({
             )}
 
             {/* TAB: COMPRA DE DÓLARES (GLOBAL / TODAS LAS UNIDADES) */}
-            {activeTab === "dolares" && (
-              <section>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
-                  <div>
-                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Nueva Compra
-                    </h3>
-                    <ComprasDolaresForm unidades={unidades} unidad={unidad} />
+            {activeTab === "dolares" && (() => {
+              const totalBolivaresAcumulados =
+                globalData?.financialSummary?.totalBolivaresAcumulados ??
+                globalData?.resumenPorUnidad?.reduce(
+                  (sum: number, u: any) => sum + (u.totalIngresosBolivares ?? 0),
+                  0
+                ) ?? 0;
+              const totalBsGastadoDolares =
+                globalData?.financialSummary?.totalBsUsadosCompras ?? 0;
+              const totalBolivaresDisponibles =
+                totalBolivaresAcumulados - totalBsGastadoDolares;
+              const totalDolaresComprados =
+                globalData?.financialSummary?.totalDolaresComprados ?? 0;
+
+              return (
+                <section className="space-y-6">
+                  {/* Resumen Global de Bolívares Acumulados por Todas las Unidades */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {/* 1. Total Bolívares Acumulados */}
+                    <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-5 flex items-center gap-4 relative overflow-hidden shadow-lg shadow-cyan-950/20">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400 shrink-0 ring-1 ring-cyan-500/30">
+                        <Banknote className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Total Bolívares Acumulados
+                        </p>
+                        <p className="font-mono text-xl sm:text-2xl font-bold text-cyan-300 mt-0.5">
+                          {formatBs(totalBolivaresAcumulados)}
+                        </p>
+                        <p className="text-xs text-cyan-400/80 mt-1">
+                          Recaudado en total por todas las unidades ({unidades.length} vehículos)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 2. Total Gastado en Compras de Dólares */}
+                    <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5 flex items-center gap-4 relative overflow-hidden shadow-lg shadow-orange-950/20">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/20 text-orange-400 shrink-0 ring-1 ring-orange-500/30">
+                        <DollarSign className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Total Gastado en Dólares
+                        </p>
+                        <p className="font-mono text-xl sm:text-2xl font-bold text-orange-300 mt-0.5">
+                          {formatBs(totalBsGastadoDolares)}
+                        </p>
+                        <p className="text-xs text-orange-400/80 mt-1">
+                          Equivalente a {formatUSD(totalDolaresComprados)} USD comprados
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 3. Bolívares Disponibles */}
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 flex items-center gap-4 relative overflow-hidden shadow-lg shadow-emerald-950/20 sm:col-span-2 lg:col-span-1">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0 ring-1 ring-emerald-500/30">
+                        <TrendingUp className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Bolívares Disponibles
+                        </p>
+                        <p className="font-mono text-xl sm:text-2xl font-bold text-emerald-300 mt-0.5">
+                          {formatBs(totalBolivaresDisponibles)}
+                        </p>
+                        <p className="text-xs text-emerald-400/80 mt-1">
+                          Saldo restante en Bs tras compra de divisas
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Historial de Compras (Todas las Unidades)
-                    </h3>
-                    <ComprasDolaresTable compras={comprasDolares as ComprasDolares[]} />
+
+                  {/* Formulario y Tabla de Compras */}
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+                    <div>
+                      <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        Nueva Compra
+                      </h3>
+                      <ComprasDolaresForm
+                        unidades={unidades}
+                        unidad={unidad}
+                        bolivaresAcumulados={totalBolivaresAcumulados}
+                        bolivaresDisponibles={totalBolivaresDisponibles}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        Historial de Compras (Todas las Unidades)
+                      </h3>
+                      <ComprasDolaresTable compras={comprasDolares as ComprasDolares[]} />
+                    </div>
                   </div>
-                </div>
-              </section>
-            )}
+                </section>
+              );
+            })()}
 
             {/* TAB: CHOFER (RENDIMIENTO DE OPERADORES - GLOBAL) */}
             {activeTab === "chofer" && (

@@ -214,6 +214,8 @@ export interface FinancialSummary {
   totalIngresosBolivares: number;
   /** Ingresos en Bolívares antes de restar gastos directos en Bs */
   totalIngresosBolivaresBruto?: number;
+  /** Total de todos los bolívares acumulados por todas las unidades antes de compras de divisas */
+  totalBolivaresAcumulados?: number;
   totalGastosRepuestos: number;
   totalGastosRepuestosBs?: number;
   totalMantenimientoAceite: number;

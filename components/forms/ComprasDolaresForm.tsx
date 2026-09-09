@@ -26,6 +26,8 @@ import {
 interface ComprasDolaresFormProps {
   unidad?: Unidad;
   unidades?: Unidad[];
+  bolivaresAcumulados?: number;
+  bolivaresDisponibles?: number;
 }
 
 const initialState: ActionResult<ComprasDolares> = { success: false };
@@ -49,7 +51,12 @@ function formatCurrency(val: number, currency = "BS", locale = "es-VE") {
   );
 }
 
-export function ComprasDolaresForm({ unidad, unidades }: ComprasDolaresFormProps) {
+export function ComprasDolaresForm({
+  unidad,
+  unidades,
+  bolivaresAcumulados,
+  bolivaresDisponibles,
+}: ComprasDolaresFormProps) {
   const [state, action, isPending] = useActionState(
     registrarCompraDolaresAction,
     initialState
@@ -88,6 +95,26 @@ export function ComprasDolaresForm({ unidad, unidades }: ComprasDolaresFormProps
           </p>
         </div>
       </div>
+
+      {/* Resumen de Bolívares Acumulados y Disponibles */}
+      {bolivaresAcumulados !== undefined && (
+        <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-3 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Total Bs Acumulado (Flota):</span>
+            <span className="font-mono font-bold text-cyan-300">
+              Bs {bolivaresAcumulados.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          {bolivaresDisponibles !== undefined && (
+            <div className="flex items-center justify-between pt-1 border-t border-white/10">
+              <span className="text-slate-400">Saldo Bs Disponible:</span>
+              <span className="font-mono font-bold text-emerald-300">
+                Bs {bolivaresDisponibles.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Feedback */}
       {showSuccess && (

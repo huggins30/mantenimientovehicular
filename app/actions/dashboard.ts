@@ -411,11 +411,13 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     sum + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0
   );
 
+  // Total de todos los bolívares acumulados / recaudados por todas las unidades
+  const totalBolivaresAcumulados = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
+
   // monto_ingreso ya tiene las deducciones de operador/colector (factor 0.7675)
   // Ingresos en Bs: neto tras compra de divisas. NO se restan gastos directos en Bs.
   const totalIngresosBolivaresBruto =
-    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
-    totalBsUsadosCompras;
+    totalBolivaresAcumulados - totalBsUsadosCompras;
 
   // totalIngresosBolivares = ingreso disponible en Bs (sin restar gastos directos en Bs)
   const totalIngresosBolivares = totalIngresosBolivaresBruto;
@@ -537,6 +539,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalIngresosDolares,
       totalIngresosBolivares,
       totalIngresosBolivaresBruto,
+      totalBolivaresAcumulados,
       totalGastosRepuestos,
       totalGastosRepuestosBs,
       totalMantenimientoAceite,

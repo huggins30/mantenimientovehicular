@@ -36,7 +36,7 @@ PASO 4: Guardar los cambios con un mensaje de commit
 ------------------------------------------------------------------------
 Ejecuta:
 
-git commit -m "Ajuste en calculos de ingresos, conversion de divisas y compra de dolares global"
+git commit -m "Total de Bolivares acumulados por todas las unidades y ajuste en compra de dolares global"
 
 
 ------------------------------------------------------------------------
