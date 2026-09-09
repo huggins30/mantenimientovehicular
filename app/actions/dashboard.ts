@@ -169,30 +169,22 @@ export async function getDashboardData(
   const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
 
   // ---- Cálculos financieros ----
-  const totalDolaresComprados = comprasDolares.reduce(
-    (sum, c) => sum + (Number(c.cantidad_dolares) || 0),
-    0
-  );
-  const totalBsUsadosCompras = comprasDolares.reduce(
-    (sum, c) =>
-      sum +
-      (Number(c.costo_bolivares) ||
-        (Number(c.cantidad_dolares) * Number(c.tasa_cambio)) ||
-        0),
-    0
-  );
+  // Las compras de dólares son operaciones globales de tesorería:
+  // no restan bolívares ni agregan dólares comprados a nivel de unidad individual.
+  const totalDolaresComprados = 0;
+  const totalBsUsadosCompras = 0;
+
   // Gastos en Bs directos (NO convertidos a USD)
   const totalGastosBsDirecto = registrosMantenimiento.reduce((sum, r) =>
     sum + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0
   );
 
   // monto_ingreso ya tiene las deducciones de operador/colector aplicadas (factor 0.7675)
-  // Ingresos en Bs: neto tras compra de divisas. NO se restan gastos directos en Bs.
+  // Ingresos en Bs recaudados por la unidad (sin restar compra global de divisas).
   const totalIngresosBolivaresBruto =
-    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0) -
-    totalBsUsadosCompras;
+    ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
 
-  // totalIngresosBolivares = ingreso disponible en Bs (sin restar gastos directos en Bs)
+  // totalIngresosBolivares = ingreso disponible en Bs generado por la unidad
   const totalIngresosBolivares = totalIngresosBolivaresBruto;
   const totalIngresos = totalIngresosBolivares;
 
@@ -200,7 +192,7 @@ export async function getDashboardData(
     ingresos.reduce(
       (sum, i) => sum + (Number(i.dolares) || 0),
       0
-    ) + totalDolaresComprados;
+    );
 
   // Los gastos de mantenimiento se separan en repuestos y mano de obra
   const totalGastosRepuestos = registrosMantenimiento.reduce(
@@ -465,35 +457,26 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const resumenPorUnidad: ResumenPorUnidad[] = unidades.map((u) => {
     const uid = u.id;
     const uIngresosList = ingresos.filter((i) => i.unidad_id === uid);
-    const uDolaresComprados = comprasDolares
-      .filter((c) => c.unidad_id === uid)
-      .reduce((s, c) => s + (Number(c.cantidad_dolares) || 0), 0);
-    const uBsUsadosCompras = comprasDolares
-      .filter((c) => c.unidad_id === uid)
-      .reduce(
-        (s, c) =>
-          s +
-          (Number(c.costo_bolivares) ||
-            (Number(c.cantidad_dolares) * Number(c.tasa_cambio)) ||
-            0),
-        0
-      );
+    // Las compras de dólares son globales: solo restan bolívares en el Resumen Global, NO del resumen por unidad
+    const uDolaresComprados = 0;
+    const uBsUsadosCompras = 0;
+
     // Gastos en Bs directos por unidad (NO convertidos)
     const uGastosBsDirecto = registrosMantenimiento
       .filter((r) => r.unidad_id === uid)
       .reduce((s, r) => s + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0);
 
+    // Ingresos en Bs propios recaudados por la unidad (sin restar compra de divisas global)
     const uIngresosBolivaresBruto =
-      uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0) -
-      uBsUsadosCompras;
+      uIngresosList.reduce((s, i) => s + (i.monto_ingreso ?? 0), 0);
 
-    // Ingresos Bs por unidad: neto tras compra divisas. NO se restan gastos directos.
+    // Ingresos Bs por unidad: recaudación real de la unidad. NO se restan compras de dólares globales ni gastos directos.
     const uIngresosBolivares = uIngresosBolivaresBruto;
     const uIngresos = uIngresosBolivares;
 
+    // Ingresos en $ propios recaudados por la unidad
     const uIngresosDolares =
-      uIngresosList.reduce((s, i) => s + (Number(i.dolares) || 0), 0) +
-      uDolaresComprados;
+      uIngresosList.reduce((s, i) => s + (Number(i.dolares) || 0), 0);
 
     const uGastos = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + ((r as any).rep_subtotal ?? 0), 0);
     const uManoObra = registrosMantenimiento.filter((r) => r.unidad_id === uid).reduce((s, r) => s + ((r as any).mo_costo ?? 0), 0);
