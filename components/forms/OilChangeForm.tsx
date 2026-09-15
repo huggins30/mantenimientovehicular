@@ -261,7 +261,7 @@ export function OilChangeForm({ unidad }: OilChangeFormProps) {
             <FormInput
               id="costo-servicio"
               name="costo_servicio"
-              label="Costo del Servicio (S/.)"
+              label="Costo del Servicio ($)"
               type="number"
               placeholder="0.00"
               required

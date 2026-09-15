@@ -15,6 +15,7 @@ import {
   Settings,
   DollarSign,
   UserCheck,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,6 +60,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       label: "Piezas y Repuestos",
       icon: Package,
       description: "Repuestos y mano de obra",
+    },
+    {
+      id: "reporte",
+      label: "Reporte de Mantenimiento",
+      icon: ClipboardList,
+      description: "Piezas y cambios de aceite",
     },
   ];
 

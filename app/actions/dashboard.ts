@@ -129,7 +129,8 @@ export async function getDashboardData(
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
-        .order("fecha_servicio", { ascending: false }),
+        .order("fecha_servicio", { ascending: false })
+        .order("kilometraje_servicio", { ascending: false }),
 
       supabase
         .from("registros_mantenimiento")
@@ -194,7 +195,7 @@ export async function getDashboardData(
       0
     );
 
-  // Los gastos de mantenimiento se separan en repuestos y mano de obra
+  // Los gastos de mantenimiento se separan en repuestos, mano de obra y mantenimiento de aceite
   const totalGastosRepuestos = registrosMantenimiento.reduce(
     (sum, r) => sum + ((r as any).rep_subtotal ?? 0),
     0
@@ -203,7 +204,6 @@ export async function getDashboardData(
     (sum, r) => sum + (Number(r.mo_costo) || 0),
     0
   );
-  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra;
   const totalGastosRepuestosBs = registrosMantenimiento.reduce((sum, r) => {
     const directBs = (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0);
     if (directBs > 0) return sum + directBs;
@@ -215,6 +215,7 @@ export async function getDashboardData(
     (sum, m) => sum + (m.costo_servicio ?? 0),
     0
   );
+  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra + totalMantenimientoAceite;
 
   const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
   const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
@@ -251,9 +252,13 @@ export async function getDashboardData(
   };
 
   // ---- Estado del semáforo de aceite ----
-  const ultimoMantenimiento = mantenimientos[0] ?? null;
+  // El semáforo debe reflejar el estado mecánico real de la unidad (último servicio histórico),
+  // independientemente de si hay un filtro de fecha activo para los ingresos/gastos.
+  const ultimoMantenimiento = rawMantenimientos[0] ?? null;
   const proximoKilometraje = ultimoMantenimiento?.proximo_kilometraje ?? 0;
-  const kmRestantes = proximoKilometraje - unidad.kilometraje_actual;
+  const kmRestantes = ultimoMantenimiento
+    ? proximoKilometraje - unidad.kilometraje_actual
+    : 0;
 
   const oilStatus = await getOilChangeStatus(
     unidad.kilometraje_actual,
@@ -262,7 +267,7 @@ export async function getDashboardData(
 
   const oilChangeStatusData: OilChangeStatusData = {
     status: ultimoMantenimiento ? oilStatus : "green",
-    kmRestantes: Math.max(kmRestantes, 0),
+    kmRestantes,
     proximoKilometraje,
     ultimoServicio: ultimoMantenimiento,
   };
@@ -429,7 +434,8 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
 
   const totalGastosRepuestos = registrosMantenimiento.reduce((sum, r) => sum + ((r as any).rep_subtotal ?? 0), 0);
   const totalManoObra = registrosMantenimiento.reduce((sum, r) => sum + ((r as any).mo_costo ?? 0), 0);
-  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra;
+  const totalMantenimientoAceite = mantenimientos.reduce((sum, m) => sum + (m.costo_servicio ?? 0), 0);
+  const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra + totalMantenimientoAceite;
   const totalGastosRepuestosBs = registrosMantenimiento.reduce((sum, r) => {
     const directBs = (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0);
     if (directBs > 0) return sum + directBs;
@@ -437,9 +443,8 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     if (r.tasa_cambio && r.costo_total) return sum + (Number(r.costo_total) * Number(r.tasa_cambio));
     return sum;
   }, 0);
-  const totalMantenimientoAceite = mantenimientos.reduce((sum, m) => sum + (m.costo_servicio ?? 0), 0);
 
-  // Rentabilidad global en USD = Ingresos$ − (Repuestos$ + Mano de Obra$)
+  // Rentabilidad global en USD = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$)
   const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
   const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
   const rentabilidadNeta = rentabilidadDolares;
@@ -490,8 +495,8 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       return s;
     }, 0);
     const uAceite = mantenimientos.filter((m) => m.unidad_id === uid).reduce((s, m) => s + (m.costo_servicio ?? 0), 0);
-    // Rentabilidad $ por unidad = Ingresos$ − (Repuestos$ + Mano de Obra$)
-    const uRentabilidadDolares = uIngresosDolares - (uGastos + uManoObra);
+    // Rentabilidad $ por unidad = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$)
+    const uRentabilidadDolares = uIngresosDolares - (uGastos + uManoObra + uAceite);
     const uRentabilidadBolivares = uIngresosBolivares - uGastosBs;
     // Rentabilidad en Bs por unidad: Ingresos Bs − Gastos directos en Bs
     const uRentabilidadBsDirecta = uIngresosBolivares - uGastosBsDirecto;

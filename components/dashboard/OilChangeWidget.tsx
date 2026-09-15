@@ -168,9 +168,11 @@ export function OilChangeWidget({ data, kilometrajeActual }: OilChangeWidgetProp
           </p>
         </div>
 
-        {/* KM Restantes */}
+        {/* KM Restantes o Excedidos */}
         <div className="rounded-xl bg-white/5 p-3 text-center">
-          <p className="text-xs text-slate-500">KM Restantes</p>
+          <p className="text-xs text-slate-500">
+            {data.status === "red" ? "KM Excedidos" : "KM Restantes"}
+          </p>
           <p className={`mt-1 text-sm font-bold ${config.text}`}>
             {data.status === "red"
               ? `+${new Intl.NumberFormat("es-PE").format(Math.abs(data.kmRestantes))}`

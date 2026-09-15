@@ -42,9 +42,10 @@ import { EditUnitForm } from "@/components/forms/EditUnitForm";
 import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
+import { ReporteMantenimiento } from "@/components/dashboard/ReporteMantenimiento";
 import { getAllComprasDolares } from "@/app/actions/dolares";
 import { getChoferPerformanceData } from "@/app/actions/chofer";
-import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup } from "@/lib/types";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite } from "@/lib/types";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -292,6 +293,7 @@ export default async function DashboardPage({
                   {activeTab === "mano-obra" && `Mano de Obra: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "ingresos" && `Ingresos Diarios: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "datos" && `Datos de la Unidad: ${unidad?.numero_unidad || unidad?.placa}`}
+                  {activeTab === "reporte" && `Reporte de Mantenimiento: ${unidad?.numero_unidad || unidad?.placa}`}
                 </h2>
                 <p className="mt-1 text-slate-400 text-sm">
                   {activeTab === "general" 
@@ -450,10 +452,18 @@ export default async function DashboardPage({
                           </span>
                         </div>
                       )}
+                      {(globalData.financialSummary.totalMantenimientoAceite ?? 0) > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-yellow-400/80 font-medium">Aceite:</span>
+                          <span className="text-yellow-300 font-mono font-semibold text-xs">
+                            {formatUSD(globalData.financialSummary.totalMantenimientoAceite ?? 0)}
+                          </span>
+                        </div>
+                      )}
                       <div className="border-t border-white/10 mt-0.5 pt-0.5 flex items-center gap-1.5">
                         <span className="text-[10px] text-red-400/80 font-medium">Total:</span>
                         <span className="text-red-300 font-mono font-semibold text-xs">
-                          {formatUSD((globalData.financialSummary.totalGastosRepuestos) + (globalData.financialSummary.totalManoObra ?? 0))}
+                          {formatUSD((globalData.financialSummary.totalGastosRepuestos) + (globalData.financialSummary.totalManoObra ?? 0) + (globalData.financialSummary.totalMantenimientoAceite ?? 0))}
                         </span>
                       </div>
                     </div>
@@ -659,10 +669,18 @@ export default async function DashboardPage({
                             </span>
                           </div>
                         )}
+                        {(financialSummary.totalMantenimientoAceite ?? 0) > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-yellow-400/80 font-medium">Aceite:</span>
+                            <span className="text-yellow-300 font-mono font-semibold text-xs">
+                              {formatUSD(financialSummary.totalMantenimientoAceite ?? 0)}
+                            </span>
+                          </div>
+                        )}
                         <div className="border-t border-white/10 mt-0.5 pt-0.5 flex items-center gap-1.5">
                           <span className="text-[10px] text-red-400/80 font-medium">Total:</span>
                           <span className="text-red-300 font-mono font-semibold text-xs">
-                            {formatUSD((financialSummary.totalGastosRepuestos) + (financialSummary.totalManoObra ?? 0))}
+                            {formatUSD((financialSummary.totalGastosRepuestos) + (financialSummary.totalManoObra ?? 0) + (financialSummary.totalMantenimientoAceite ?? 0))}
                           </span>
                         </div>
                       </div>
@@ -917,6 +935,16 @@ export default async function DashboardPage({
             {activeTab === "datos" && unidad && (
               <section className="py-6">
                 <EditUnitForm unidad={unidad} />
+              </section>
+            )}
+
+            {/* TAB: REPORTE DE MANTENIMIENTO */}
+            {activeTab === "reporte" && dashboardData && (
+              <section>
+                <ReporteMantenimiento
+                  registros={dashboardData.ultimosRegistrosMantenimiento as RegistroMantenimiento[]}
+                  cambiosAceite={dashboardData.ultimosMantenimientos as MantenimientoAceite[]}
+                />
               </section>
             )}
 

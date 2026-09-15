@@ -148,7 +148,7 @@ export async function registrarCambioAceite(
   if (!data.kilometraje_servicio || data.kilometraje_servicio <= 0) {
     return { success: false, error: "El kilometraje del servicio es requerido." };
   }
-  if (!data.costo_servicio || data.costo_servicio < 0) {
+  if (data.costo_servicio === undefined || data.costo_servicio === null || isNaN(data.costo_servicio) || data.costo_servicio < 0) {
     return { success: false, error: "El costo del servicio no puede ser negativo." };
   }
 
