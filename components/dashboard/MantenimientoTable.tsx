@@ -6,6 +6,7 @@
 // ============================================================
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { eliminarRegistroMantenimientoAction } from "@/app/actions/mantenimiento";
 import type { RegistroMantenimiento } from "@/lib/types";
 import {
@@ -13,6 +14,7 @@ import {
   Hammer,
   CalendarDays,
   Trash2,
+  Loader2,
   Store,
   Eye,
   X,
@@ -398,6 +400,7 @@ function DetalleModal({
 
 // ── Tabla ────────────────────────────────────────────────────
 export function MantenimientoTable({ registros }: MantenimientoTableProps) {
+  const router = useRouter();
   const [selectedRegistro, setSelectedRegistro] = useState<RegistroMantenimiento | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -405,8 +408,18 @@ export function MantenimientoTable({ registros }: MantenimientoTableProps) {
   const handleDelete = async (id: number) => {
     if (!confirm("¿Eliminar este registro de mantenimiento?")) return;
     setDeletingId(id);
-    await eliminarRegistroMantenimientoAction(id);
-    setDeletingId(null);
+    try {
+      const res = await eliminarRegistroMantenimientoAction(id);
+      if (!res.success) {
+        alert(res.error || "Error al eliminar");
+      } else {
+        router.refresh();
+      }
+    } catch (err: any) {
+      alert(err?.message || "Error al eliminar");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (registros.length === 0) {
@@ -540,7 +553,11 @@ export function MantenimientoTable({ registros }: MantenimientoTableProps) {
                     title="Eliminar"
                     className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {deletingId === r.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
                   </button>
                 </div>
               </div>

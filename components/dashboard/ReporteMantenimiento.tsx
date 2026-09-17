@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
-import { Package, Droplets, CalendarDays, Wrench, DollarSign, Banknote } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Package, Droplets, CalendarDays, Wrench, DollarSign, Banknote, Trash2, Loader2 } from "lucide-react";
 import { MantenimientoTable } from "@/components/dashboard/MantenimientoTable";
+import { eliminarCambioAceiteAction } from "@/app/actions/unidades";
 import type { RegistroMantenimiento, MantenimientoAceite } from "@/lib/types";
 
 interface ReporteMantenimientoProps {
@@ -55,7 +57,37 @@ function TotalesCards({ totalUSD, totalBs, labelUSD, labelBs }: { totalUSD: numb
   );
 }
 
-function CambiosAceiteTab({ cambios }: { cambios: MantenimientoAceite[] }) {
+function CambiosAceiteTab({
+  cambios,
+  onDeleted,
+}: {
+  cambios: MantenimientoAceite[];
+  onDeleted?: (id: number) => void;
+}) {
+  const router = useRouter();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este registro de cambio de aceite?")) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await eliminarCambioAceiteAction(id);
+      if (!res.success) {
+        alert(res.error || "No se pudo eliminar el registro de cambio de aceite.");
+      } else {
+        onDeleted?.(id);
+        router.refresh();
+      }
+    } catch (err: any) {
+      alert(err?.message || "Ocurrió un error al eliminar.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (cambios.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -100,6 +132,7 @@ function CambiosAceiteTab({ cambios }: { cambios: MantenimientoAceite[] }) {
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest text-slate-500">Proximo KM</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest text-slate-500">Costo (USD)</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-500">Notas</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-widest text-slate-500 w-16">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -124,6 +157,20 @@ function CambiosAceiteTab({ cambios }: { cambios: MantenimientoAceite[] }) {
                   <td className="px-4 py-3 text-right font-mono text-emerald-400">{formatKm(cambio.proximo_kilometraje)}</td>
                   <td className="px-4 py-3 text-right"><span className="font-mono font-semibold text-emerald-300">{formatUSD(cambio.costo_servicio)}</span></td>
                   <td className="px-4 py-3 text-slate-500 text-xs max-w-[180px] truncate">{cambio.notas || "-"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleDelete(cambio.id)}
+                      disabled={deletingId === cambio.id}
+                      title="Eliminar este cambio de aceite"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                    >
+                      {deletingId === cambio.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -136,6 +183,11 @@ function CambiosAceiteTab({ cambios }: { cambios: MantenimientoAceite[] }) {
 
 export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteMantenimientoProps) {
   const [activeTab, setActiveTab] = useState<"repuestos" | "aceite">("repuestos");
+  const [cambiosList, setCambiosList] = useState<MantenimientoAceite[]>(cambiosAceite);
+
+  useEffect(() => {
+    setCambiosList(cambiosAceite);
+  }, [cambiosAceite]);
 
   const repTotalUSD = registros.reduce((sum, r) => sum + (r.costo_total || 0), 0);
   const repTotalBs = registros.reduce((sum, r) => {
@@ -144,12 +196,12 @@ export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteManten
     return sum + (bsDirecto > 0 ? bsDirecto : bsConvertido);
   }, 0);
 
-  const aceiteTotalUSD = cambiosAceite.reduce((sum, c) => sum + (c.costo_servicio || 0), 0);
+  const aceiteTotalUSD = cambiosList.reduce((sum, c) => sum + (c.costo_servicio || 0), 0);
   const aceiteTotalBs = 0;
 
   const tabs = [
     { id: "repuestos" as const, label: "Piezas y Repuestos", icon: Package, count: registros.length, color: "violet" },
-    { id: "aceite" as const, label: "Cambios de Aceite", icon: Droplets, count: cambiosAceite.length, color: "cyan" },
+    { id: "aceite" as const, label: "Cambios de Aceite", icon: Droplets, count: cambiosList.length, color: "cyan" },
   ];
 
   const totalUSD = activeTab === "repuestos" ? repTotalUSD : aceiteTotalUSD;
@@ -185,9 +237,13 @@ export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteManten
         {activeTab === "repuestos" ? (
           <MantenimientoTable registros={registros} />
         ) : (
-          <CambiosAceiteTab cambios={cambiosAceite} />
+          <CambiosAceiteTab
+            cambios={cambiosList}
+            onDeleted={(deletedId) => setCambiosList((prev) => prev.filter((c) => c.id !== deletedId))}
+          />
         )}
       </div>
     </div>
   );
 }
+

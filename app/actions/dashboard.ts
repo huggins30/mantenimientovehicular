@@ -276,7 +276,7 @@ export async function getDashboardData(
     unidad,
     financialSummary,
     oilChangeStatus: oilChangeStatusData,
-    ultimosMantenimientos: mantenimientos.slice(0, 5),
+    ultimosMantenimientos: mantenimientos,
     ultimosGastos: [],
     ultimosGastosManoObra: [],
     ultimosIngresos: ingresos,

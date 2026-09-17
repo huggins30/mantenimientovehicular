@@ -289,3 +289,31 @@ export async function editarUnidadAction(
   revalidatePath("/");
   return { success: true, data: data as Unidad };
 }
+
+// -------------------------------------------------------
+// Eliminar Cambio de Aceite
+// -------------------------------------------------------
+export async function eliminarCambioAceiteAction(
+  id: number
+): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { success: false, error: "No estás autenticado." };
+  }
+
+  const { error } = await supabase
+    .from("mantenimientos_aceite")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: `Error al eliminar cambio de aceite: ${error.message}` };
+  }
+
+  revalidatePath("/");
+  return { success: true };
+}
+
