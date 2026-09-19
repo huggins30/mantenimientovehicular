@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Droplets, CalendarDays, Wrench, DollarSign, Banknote, Trash2, Loader2 } from "lucide-react";
+import { Package, Droplets, CalendarDays, Wrench, DollarSign, Banknote, Trash2, Loader2, Filter } from "lucide-react";
 import { MantenimientoTable } from "@/components/dashboard/MantenimientoTable";
 import { eliminarCambioAceiteAction } from "@/app/actions/unidades";
 import type { RegistroMantenimiento, MantenimientoAceite } from "@/lib/types";
@@ -182,7 +182,7 @@ function CambiosAceiteTab({
 }
 
 export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteMantenimientoProps) {
-  const [activeTab, setActiveTab] = useState<"repuestos" | "aceite">("repuestos");
+  const [activeTab, setActiveTab] = useState<"repuestos" | "aceite" | "filtros">("repuestos");
   const [cambiosList, setCambiosList] = useState<MantenimientoAceite[]>(cambiosAceite);
 
   useEffect(() => {
@@ -199,23 +199,61 @@ export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteManten
   const aceiteTotalUSD = cambiosList.reduce((sum, c) => sum + (c.costo_servicio || 0), 0);
   const aceiteTotalBs = 0;
 
+  // Filtrar exclusivamente los registros que corresponden a Filtros
+  const registrosFiltros = registros.filter((r) =>
+    (r.rep_concepto || "").toLowerCase().includes("filtro")
+  );
+
+  const filtrosTotalUSD = registrosFiltros.reduce((sum, r) => sum + (r.costo_total || 0), 0);
+  const filtrosTotalBs = registrosFiltros.reduce((sum, r) => {
+    const bsDirecto = (r.precio_bs_repuestos || 0) + (r.precio_bs_mano_obra || 0);
+    const bsConvertido = r.costo_bolivares || 0;
+    return sum + (bsDirecto > 0 ? bsDirecto : bsConvertido);
+  }, 0);
+
   const tabs = [
     { id: "repuestos" as const, label: "Piezas y Repuestos", icon: Package, count: registros.length, color: "violet" },
     { id: "aceite" as const, label: "Cambios de Aceite", icon: Droplets, count: cambiosList.length, color: "cyan" },
+    { id: "filtros" as const, label: "Filtros", icon: Filter, count: registrosFiltros.length, color: "amber" },
   ];
 
-  const totalUSD = activeTab === "repuestos" ? repTotalUSD : aceiteTotalUSD;
-  const totalBs  = activeTab === "repuestos" ? repTotalBs  : aceiteTotalBs;
+  const totalUSD =
+    activeTab === "repuestos"
+      ? repTotalUSD
+      : activeTab === "aceite"
+      ? aceiteTotalUSD
+      : filtrosTotalUSD;
+
+  const totalBs =
+    activeTab === "repuestos"
+      ? repTotalBs
+      : activeTab === "aceite"
+      ? aceiteTotalBs
+      : filtrosTotalBs;
+
+  const labelUSD =
+    activeTab === "repuestos"
+      ? "Total Gastos en Dolares - Repuestos"
+      : activeTab === "aceite"
+      ? "Total Gastos en Dolares - Aceite"
+      : "Total Gastos en Dolares - Filtros";
+
+  const labelBs =
+    activeTab === "repuestos"
+      ? "Total Gastos en Bolivares - Repuestos"
+      : activeTab === "aceite"
+      ? "Total Gastos en Bolivares - Aceite"
+      : "Total Gastos en Bolivares - Filtros";
 
   return (
     <div className="space-y-5">
       <TotalesCards
         totalUSD={totalUSD}
         totalBs={totalBs}
-        labelUSD={activeTab === "repuestos" ? "Total Gastos en Dolares - Repuestos" : "Total Gastos en Dolares - Aceite"}
-        labelBs={activeTab === "repuestos" ? "Total Gastos en Bolivares - Repuestos" : "Total Gastos en Bolivares - Aceite"}
+        labelUSD={labelUSD}
+        labelBs={labelBs}
       />
-      <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/10 w-fit">
+      <div className="flex gap-2 p-1 rounded-2xl bg-white/5 border border-white/10 w-fit flex-wrap">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -224,22 +262,49 @@ export function ReporteMantenimiento({ registros, cambiosAceite }: ReporteManten
               key={tab.id}
               id={`reporte-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${isActive ? (tab.color === "violet" ? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 shadow-lg shadow-violet-500/10" : "bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10") : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+              className={`relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? tab.color === "violet"
+                    ? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 shadow-lg shadow-violet-500/10"
+                    : tab.color === "cyan"
+                    ? "bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10"
+                    : "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30 shadow-lg shadow-amber-500/10"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+              }`}
             >
               <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
               <span>{tab.label}</span>
-              <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? (tab.color === "violet" ? "bg-violet-500/30 text-violet-200" : "bg-cyan-500/30 text-cyan-200") : "bg-white/10 text-slate-500"}`}>{tab.count}</span>
+              <span
+                className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  isActive
+                    ? tab.color === "violet"
+                      ? "bg-violet-500/30 text-violet-200"
+                      : tab.color === "cyan"
+                      ? "bg-cyan-500/30 text-cyan-200"
+                      : "bg-amber-500/30 text-amber-200"
+                    : "bg-white/10 text-slate-500"
+                }`}
+              >
+                {tab.count}
+              </span>
             </button>
           );
         })}
       </div>
       <div key={activeTab}>
-        {activeTab === "repuestos" ? (
+        {activeTab === "repuestos" && (
           <MantenimientoTable registros={registros} />
-        ) : (
+        )}
+        {activeTab === "aceite" && (
           <CambiosAceiteTab
             cambios={cambiosList}
             onDeleted={(deletedId) => setCambiosList((prev) => prev.filter((c) => c.id !== deletedId))}
+          />
+        )}
+        {activeTab === "filtros" && (
+          <MantenimientoTable
+            registros={registrosFiltros}
+            emptyMessage="Sin registros de filtros aún."
           />
         )}
       </div>

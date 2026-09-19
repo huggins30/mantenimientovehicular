@@ -294,20 +294,69 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 </div>
 
                 {/* Nombre de la pieza */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-medium text-slate-400">
-                    Nombre de la pieza <span className="text-red-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder="Ej: Pastillas de freno, Filtro de aire, Amortiguador..."
-                      required
-                      value={p.concepto}
-                      onChange={(e) => actualizarPieza(p.id, "concepto", e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40"
-                    />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-medium text-slate-400">
+                      Nombre de la pieza <span className="text-red-400">*</span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-500 hidden sm:inline">Rápido:</span>
+                      <button
+                        type="button"
+                        onClick={() => actualizarPieza(p.id, "concepto", "Filtro")}
+                        className={`px-2 py-0.5 text-[11px] rounded-md transition-all ${
+                          p.concepto === "Filtro"
+                            ? "bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold"
+                            : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                        }`}
+                      >
+                        Filtro
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => actualizarPieza(p.id, "concepto", "Filtro de Gasoil")}
+                        className={`px-2 py-0.5 text-[11px] rounded-md transition-all ${
+                          p.concepto === "Filtro de Gasoil"
+                            ? "bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold"
+                            : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                        }`}
+                      >
+                        Filtro de Gasoil
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <select
+                      value={["Filtro", "Filtro de Gasoil"].includes(p.concepto) ? p.concepto : ""}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          actualizarPieza(p.id, "concepto", e.target.value);
+                        }
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-[#141424] px-3 py-2 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 cursor-pointer"
+                    >
+                      <option value="" className="bg-[#141424] text-slate-400">Seleccionar de la lista...</option>
+                      <option value="Filtro" className="bg-[#141424] text-white">Filtro</option>
+                      <option value="Filtro de Gasoil" className="bg-[#141424] text-white">Filtro de Gasoil</option>
+                    </select>
+
+                    <div className="relative">
+                      <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                      <input
+                        type="text"
+                        list={`datalist-piezas-${p.id}`}
+                        placeholder="O escribe aquí texto libre (Ej: Pastillas de freno, Filtro...)"
+                        required
+                        value={p.concepto}
+                        onChange={(e) => actualizarPieza(p.id, "concepto", e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40"
+                      />
+                      <datalist id={`datalist-piezas-${p.id}`}>
+                        <option value="Filtro" />
+                        <option value="Filtro de Gasoil" />
+                      </datalist>
+                    </div>
                   </div>
                 </div>
 

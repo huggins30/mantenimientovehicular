@@ -27,6 +27,7 @@ import {
 
 interface MantenimientoTableProps {
   registros: RegistroMantenimiento[];
+  emptyMessage?: string;
 }
 
 function formatUSD(amount: number) {
@@ -399,7 +400,10 @@ function DetalleModal({
 }
 
 // ── Tabla ────────────────────────────────────────────────────
-export function MantenimientoTable({ registros }: MantenimientoTableProps) {
+export function MantenimientoTable({
+  registros,
+  emptyMessage = "Sin registros de mantenimiento aún.",
+}: MantenimientoTableProps) {
   const router = useRouter();
   const [selectedRegistro, setSelectedRegistro] = useState<RegistroMantenimiento | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -426,7 +430,7 @@ export function MantenimientoTable({ registros }: MantenimientoTableProps) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
         <Package className="mx-auto h-10 w-10 text-slate-600 mb-3" strokeWidth={1} />
-        <p className="text-sm text-slate-500">Sin registros de mantenimiento aún.</p>
+        <p className="text-sm text-slate-500">{emptyMessage}</p>
       </div>
     );
   }
