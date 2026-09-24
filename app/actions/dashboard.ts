@@ -115,14 +115,18 @@ export async function getDashboardData(
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
-        .order("fecha", { ascending: false }),
+        .order("fecha", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }),
 
       supabase
         .from("ingresos_diarios_f")
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
-        .order("fecha", { ascending: false }),
+        .order("fecha", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }),
 
       supabase
         .from("mantenimientos_aceite")
@@ -137,7 +141,9 @@ export async function getDashboardData(
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id)
-        .order("fecha", { ascending: false }),
+        .order("fecha", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }),
 
       supabase
         .from("compras_dolares")
@@ -156,9 +162,20 @@ export async function getDashboardData(
   const unidad: Unidad = unidadRes.data;
   const rawIngresosComun = (ingresosRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "comun" as const }));
   const rawIngresosF = (ingresosFRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "fraternidad" as const }));
-  const rawIngresos = [...rawIngresosComun, ...rawIngresosF].sort(
-    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-  );
+  const rawIngresos = [...rawIngresosComun, ...rawIngresosF].sort((a, b) => {
+    // 1. Por fecha descendente
+    const dateA = a.fecha ? new Date(a.fecha).getTime() : 0;
+    const dateB = b.fecha ? new Date(b.fecha).getTime() : 0;
+    if (dateB !== dateA) return dateB - dateA;
+
+    // 2. Si tienen la misma fecha, el último registrado (created_at) primero
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (timeB !== timeA) return timeB - timeA;
+
+    // 3. Desempate por id descendente
+    return (b.id ?? 0) - (a.id ?? 0);
+  });
   const rawMantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
   const rawRegistrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
@@ -318,7 +335,9 @@ export async function getIngresosByUnidad(
     .select("*")
     .eq("unidad_id", unidadId)
     .eq("user_id", user.id)
-    .order("fecha", { ascending: false });
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
 
   return data ?? [];
 }

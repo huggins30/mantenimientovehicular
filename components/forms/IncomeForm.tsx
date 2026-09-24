@@ -8,7 +8,7 @@
 // components/forms/IncomeForm.tsx
 // ============================================================
 
-import { useActionState, useState, useEffect } from "react";
+import { useActionState, useState, useEffect, useRef } from "react";
 import {
   registrarIngresoAction,
   registrarIngresoFraternidadAction,
@@ -36,6 +36,7 @@ import {
   Sparkles,
   Route,
   ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 
 interface IncomeFormProps {
@@ -94,6 +95,20 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
     initialComunState
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastHandledStateRef = useRef<any>(null);
+
+  const today = new Date().toISOString().split("T")[0];
+  const [concepto, setConcepto] = useState("");
+  const [kilometrajeActual, setKilometrajeActual] = useState<string | number>(
+    unidad.kilometraje_actual || ""
+  );
+  const [fecha, setFecha] = useState(today);
+  const [nombreOperador, setNombreOperador] = useState("");
+  const [nombreColector, setNombreColector] = useState("Sin colector");
+  const [tipo, setTipo] = useState<"Ruta" | "Traslado">("Ruta");
+  const [comprobante, setComprobante] = useState("");
+
   const [values, setValues] = useState({
     pago_movil: 0,
     movi: 0,
@@ -103,8 +118,31 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
     otros: 0,
   });
 
-  const [nombreColector, setNombreColector] = useState("Sin colector");
-  const [tipo, setTipo] = useState<"Ruta" | "Traslado">("Ruta");
+  const resetForm = () => {
+    setConcepto("");
+    setKilometrajeActual(unidad.kilometraje_actual || "");
+    setFecha(today);
+    setNombreOperador("");
+    setNombreColector("Sin colector");
+    setTipo("Ruta");
+    setComprobante("");
+    setValues({
+      pago_movil: 0,
+      movi: 0,
+      dolares: 0,
+      monto_bs_dolar: 0,
+      efectivo: 0,
+      otros: 0,
+    });
+    formRef.current?.reset();
+  };
+
+  // Sincronizar kilometraje si la unidad se actualiza
+  useEffect(() => {
+    if (unidad.kilometraje_actual) {
+      setKilometrajeActual(unidad.kilometraje_actual);
+    }
+  }, [unidad.kilometraje_actual]);
 
   const totalConversion = (values.dolares || 0) * (values.monto_bs_dolar || 0);
   const total =
@@ -140,23 +178,14 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
 
   const [showSuccess, setShowSuccess] = useState(false);
   useEffect(() => {
-    if (state.success) {
+    if (state.success && state !== lastHandledStateRef.current) {
+      lastHandledStateRef.current = state;
       setShowSuccess(true);
-      setValues({
-        pago_movil: 0,
-        movi: 0,
-        dolares: 0,
-        monto_bs_dolar: 0,
-        efectivo: 0,
-        otros: 0,
-      });
-      setNombreColector("Sin colector");
+      resetForm();
       const t = setTimeout(() => setShowSuccess(false), 4000);
       return () => clearTimeout(t);
     }
-  }, [state.success]);
-
-  const today = new Date().toISOString().split("T")[0];
+  }, [state]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -173,9 +202,20 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
             </p>
           </div>
         </div>
-        <span className="rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-[11px] font-medium text-slate-400">
-          Unidad Común
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={resetForm}
+            title="Limpiar formulario"
+            className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Limpiar
+          </button>
+          <span className="rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+            Unidad Común
+          </span>
+        </div>
       </div>
 
       {/* Feedback */}
@@ -192,7 +232,7 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
         </div>
       )}
 
-      <form action={action} className="space-y-4">
+      <form ref={formRef} action={action} className="space-y-4">
         <input type="hidden" name="unidad_id" value={unidad.id} />
 
         {/* Concepto + Fecha + Kilometraje */}
@@ -207,6 +247,8 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
                 id="concepto"
                 name="concepto"
                 type="text"
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
                 placeholder="Ej: Flete Lima - Ica"
                 required
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
@@ -224,7 +266,8 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
                 id="kilometraje_actual"
                 name="kilometraje_actual"
                 type="number"
-                defaultValue={unidad.kilometraje_actual || ""}
+                value={kilometrajeActual}
+                onChange={(e) => setKilometrajeActual(e.target.value)}
                 required
                 placeholder="Ej: 150000"
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
@@ -242,7 +285,8 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
                 id="fecha"
                 name="fecha"
                 type="date"
-                defaultValue={today}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
                 required
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
               />
@@ -259,6 +303,8 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
                 id="nombre_operador"
                 name="nombre_operador"
                 type="text"
+                value={nombreOperador}
+                onChange={(e) => setNombreOperador(e.target.value)}
                 placeholder="Ej: Juan Pérez"
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
               />
@@ -423,6 +469,8 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
               id="comprobante"
               name="comprobante"
               type="text"
+              value={comprobante}
+              onChange={(e) => setComprobante(e.target.value)}
               placeholder="Ej: F001-000234"
               className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
             />
@@ -468,6 +516,18 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
     initialFraternidadState
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastHandledStateRef = useRef<any>(null);
+
+  const today = new Date().toISOString().split("T")[0];
+  const [concepto, setConcepto] = useState("");
+  const [kilometrajeActual, setKilometrajeActual] = useState<string | number>(
+    unidad.kilometraje_actual || ""
+  );
+  const [fecha, setFecha] = useState(today);
+  const [nombreOperador, setNombreOperador] = useState("");
+  const [comprobante, setComprobante] = useState("");
+
   const [values, setValues] = useState({
     pago_movil: 0,
     dolares: 0,
@@ -476,6 +536,30 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
     otros: 0,
     gastos: 0,
   });
+
+  const resetForm = () => {
+    setConcepto("");
+    setKilometrajeActual(unidad.kilometraje_actual || "");
+    setFecha(today);
+    setNombreOperador("");
+    setComprobante("");
+    setValues({
+      pago_movil: 0,
+      dolares: 0,
+      monto_bs_dolar: 0,
+      efectivo: 0,
+      otros: 0,
+      gastos: 0,
+    });
+    formRef.current?.reset();
+  };
+
+  // Sincronizar kilometraje si la unidad se actualiza
+  useEffect(() => {
+    if (unidad.kilometraje_actual) {
+      setKilometrajeActual(unidad.kilometraje_actual);
+    }
+  }, [unidad.kilometraje_actual]);
 
   const totalConversion = (values.dolares || 0) * (values.monto_bs_dolar || 0);
   const totalRecaudado =
@@ -495,22 +579,14 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
 
   const [showSuccess, setShowSuccess] = useState(false);
   useEffect(() => {
-    if (state.success) {
+    if (state.success && state !== lastHandledStateRef.current) {
+      lastHandledStateRef.current = state;
       setShowSuccess(true);
-      setValues({
-        pago_movil: 0,
-        dolares: 0,
-        monto_bs_dolar: 0,
-        efectivo: 0,
-        otros: 0,
-        gastos: 0,
-      });
+      resetForm();
       const t = setTimeout(() => setShowSuccess(false), 4000);
       return () => clearTimeout(t);
     }
-  }, [state.success]);
-
-  const today = new Date().toISOString().split("T")[0];
+  }, [state]);
 
   return (
     <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/5 to-white/5 p-5 shadow-xl">
@@ -527,10 +603,21 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
             </p>
           </div>
         </div>
-        <span className="flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/20 px-2.5 py-1 text-[11px] font-semibold text-violet-300">
-          <Sparkles className="h-3 w-3" />
-          Fraternidad
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={resetForm}
+            title="Limpiar formulario"
+            className="flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1 text-[11px] font-medium text-violet-300 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Limpiar
+          </button>
+          <span className="flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/20 px-2.5 py-1 text-[11px] font-semibold text-violet-300">
+            <Sparkles className="h-3 w-3" />
+            Fraternidad
+          </span>
+        </div>
       </div>
 
       {/* Feedback */}
@@ -547,7 +634,7 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
         </div>
       )}
 
-      <form action={action} className="space-y-4">
+      <form ref={formRef} action={action} className="space-y-4">
         <input type="hidden" name="unidad_id" value={unidad.id} />
 
         {/* Concepto + Fecha + Kilometraje + Operador (SIN COLECTOR) */}
@@ -562,6 +649,8 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
                 id="concepto_f"
                 name="concepto"
                 type="text"
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
                 placeholder="Ej: Recorrido Jornada"
                 required
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
@@ -579,7 +668,8 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
                 id="kilometraje_actual_f"
                 name="kilometraje_actual"
                 type="number"
-                defaultValue={unidad.kilometraje_actual || ""}
+                value={kilometrajeActual}
+                onChange={(e) => setKilometrajeActual(e.target.value)}
                 required
                 placeholder="Ej: 150000"
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
@@ -597,7 +687,8 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
                 id="fecha_f"
                 name="fecha"
                 type="date"
-                defaultValue={today}
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
                 required
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
               />
@@ -614,6 +705,8 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
                 id="nombre_operador_f"
                 name="nombre_operador"
                 type="text"
+                value={nombreOperador}
+                onChange={(e) => setNombreOperador(e.target.value)}
                 placeholder="Ej: Juan Pérez"
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
               />
@@ -769,6 +862,8 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
               id="comprobante_f"
               name="comprobante"
               type="text"
+              value={comprobante}
+              onChange={(e) => setComprobante(e.target.value)}
               placeholder="Ej: F001-000234"
               className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
             />

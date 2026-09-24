@@ -5,7 +5,7 @@
 // components/dashboard/IncomeTable.tsx
 // ============================================================
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { eliminarIngresoAction } from "@/app/actions/ingresos";
 import type { IngresoUnidad } from "@/lib/types";
 import {
@@ -334,9 +334,30 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
   const [selectedIngreso, setSelectedIngreso] = useState<IngresoUnidad | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const totalPages = Math.ceil(ingresos.length / PAGE_SIZE);
-  const paginated = ingresos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalRecaudado = ingresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
+  // Ordenar siempre: fecha descendente -> created_at descendente -> id descendente (el último pago registrado primero)
+  const sortedIngresos = useMemo(() => {
+    return [...ingresos].sort((a, b) => {
+      const dateA = a.fecha ? new Date(a.fecha).getTime() : 0;
+      const dateB = b.fecha ? new Date(b.fecha).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeB !== timeA) return timeB - timeA;
+
+      return (b.id ?? 0) - (a.id ?? 0);
+    });
+  }, [ingresos]);
+
+  // Si se registra o elimina un ingreso, regresar a la primera página para ver el último registrado
+  useEffect(() => {
+    setPage(1);
+  }, [ingresos.length]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedIngresos.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = sortedIngresos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalRecaudado = sortedIngresos.reduce((sum, i) => sum + (i.monto_ingreso ?? 0), 0);
 
   function handleDelete(id: number, tipoTabla?: string) {
     setDeletingId(id);
@@ -378,7 +399,7 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
             <TrendingUp className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
             <span className="text-sm font-semibold text-white">Historial de Ingresos</span>
             <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
-              {ingresos.length}
+              {sortedIngresos.length}
             </span>
           </div>
           <div className="text-right">
@@ -519,20 +540,20 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-white/5 px-5 py-3">
             <span className="text-xs text-slate-500">
-              Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, ingresos.length)} de {ingresos.length}
+              Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sortedIngresos.length)} de {sortedIngresos.length}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
+                disabled={currentPage === 1}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-xs text-slate-400">{page} / {totalPages}</span>
+              <span className="px-2 text-xs text-slate-400">{currentPage} / {totalPages}</span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                disabled={currentPage === totalPages}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronRight className="h-4 w-4" />

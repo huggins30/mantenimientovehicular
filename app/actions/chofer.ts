@@ -58,14 +58,18 @@ export async function getChoferPerformanceData(
       .eq("user_id", user.id),
     supabase
       .from("ingresos_unidad")
-      .select("id, unidad_id, monto_ingreso, fecha, concepto, comprobante, nombre_operador")
+      .select("id, unidad_id, monto_ingreso, fecha, concepto, comprobante, nombre_operador, created_at")
       .eq("user_id", user.id)
-      .order("fecha", { ascending: false }),
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
     supabase
       .from("ingresos_diarios_f")
-      .select("id, unidad_id, monto_ingreso, fecha, concepto, comprobante, nombre_operador")
+      .select("id, unidad_id, monto_ingreso, fecha, concepto, comprobante, nombre_operador, created_at")
       .eq("user_id", user.id)
-      .order("fecha", { ascending: false }),
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
   ]);
 
   const unidades = unidadesRes.data ?? [];
