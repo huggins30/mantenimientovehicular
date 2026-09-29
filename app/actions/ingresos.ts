@@ -90,6 +90,7 @@ export async function registrarIngresoAction(
     pago_movil:         pagoMovil,
     movi,
     dolares,
+    monto_bs_dolar:     montoBsDolar,
     efectivo,
     otros,
     nombre_operador:    nombreOperador || null,
@@ -104,13 +105,24 @@ export async function registrarIngresoAction(
     .select()
     .single();
 
-  if (error && (error.message?.includes("tipo") || error.code === "42703" || (error as any).code === "PGRST204")) {
-    delete insertPayload.tipo;
-    const retry = await supabase
+  // Retry si falla por columna faltante en bases de datos sin migrar (ej. 'monto_bs_dolar' o 'tipo')
+  if (error && (error.code === "42703" || (error as any).code === "PGRST204" || error.message?.includes("monto_bs_dolar") || error.message?.includes("tipo"))) {
+    if (error.message?.includes("monto_bs_dolar") || error.code === "42703" || (error as any).code === "PGRST204") {
+      delete insertPayload.monto_bs_dolar;
+    }
+    let retry = await supabase
       .from("ingresos_unidad")
       .insert(insertPayload)
       .select()
       .single();
+    if (retry.error && (retry.error.message?.includes("tipo") || retry.error.code === "42703" || (retry.error as any).code === "PGRST204")) {
+      delete insertPayload.tipo;
+      retry = await supabase
+        .from("ingresos_unidad")
+        .insert(insertPayload)
+        .select()
+        .single();
+    }
     ingreso = retry.data;
     error = retry.error;
   }

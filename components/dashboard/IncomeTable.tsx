@@ -76,6 +76,40 @@ function DetalleIngresoModal({
   const montoNeto = ingreso.monto_ingreso ?? 0;
   const esSinColector = (ingreso.nombre_colector ?? "").trim().toLowerCase() === "sin colector";
 
+  const pagoMovil = ingreso.pago_movil ?? 0;
+  const movi = ingreso.movi ?? 0;
+  const efectivo = ingreso.efectivo ?? 0;
+  const otros = ingreso.otros ?? 0;
+  const dolares = ingreso.dolares ?? 0;
+  const sumaBsDirectos = pagoMovil + movi + efectivo + otros;
+
+  // Conversión de dólares a Bolívares (usando monto_bs_dolar o deduciéndolo del total registrado)
+  let dolaresEnBs = 0;
+  let tasaBsDolar = 0;
+
+  if (dolares > 0) {
+    if (ingreso.monto_bs_dolar && ingreso.monto_bs_dolar > 0) {
+      tasaBsDolar = ingreso.monto_bs_dolar;
+      dolaresEnBs = dolares * tasaBsDolar;
+    } else {
+      // Reconstruir conversión a partir del monto_ingreso registrado
+      let factor = 0.7675;
+      if (esFraternidad) {
+        factor = 0.8125;
+      } else if (esSinColector) {
+        factor = ingreso.tipo === "Traslado" ? 0.8125 : 0.775;
+      }
+      const gastosFrat = esFraternidad ? (ingreso.gastos ?? 0) : 0;
+      const totalEsperado = montoNeto > 0 ? (montoNeto / factor) + gastosFrat : 0;
+      if (totalEsperado > sumaBsDirectos) {
+        dolaresEnBs = Math.round((totalEsperado - sumaBsDirectos) * 100) / 100;
+        tasaBsDolar = Math.round((dolaresEnBs / dolares) * 100) / 100;
+      }
+    }
+  }
+
+  const baseRecaudado = sumaBsDirectos + dolaresEnBs;
+
   let totalRecaudado = 0;
   let ahorroUnidad = 0;
   let colector = 0;
@@ -84,37 +118,19 @@ function DetalleIngresoModal({
 
   if (esFraternidad) {
     gastos = ingreso.gastos ?? 0;
-    const baseRecaudado =
-      (ingreso.pago_movil ?? 0) +
-      (ingreso.efectivo ?? 0) +
-      (ingreso.otros ?? 0) +
-      ((ingreso.dolares ?? 0) * (ingreso.monto_bs_dolar ?? 0));
     totalRecaudado = baseRecaudado > 0 ? baseRecaudado : (montoNeto > 0 ? (montoNeto / 0.8125) + gastos : 0);
     const baseCalculo = Math.max(0, totalRecaudado - gastos);
     ahorroUnidad = ingreso.ahorro_unidad ?? (baseCalculo * 0.25);
     const remanente = baseCalculo - ahorroUnidad;
     operador = remanente * 0.25;
   } else {
-    // Total recaudado bruto: usar suma directa del desglose de pagos si existe
-    const baseRecaudado =
-      (ingreso.pago_movil ?? 0) +
-      (ingreso.movi ?? 0) +
-      (ingreso.efectivo ?? 0) +
-      (ingreso.otros ?? 0) +
-      ((ingreso.dolares ?? 0) * (ingreso.monto_bs_dolar ?? 0));
-
+    // Total recaudado bruto: usar suma directa del desglose de pagos incluyendo dólares en Bs
     if (baseRecaudado > 0) {
       totalRecaudado = baseRecaudado;
     } else {
       // Reconstrucción a partir del neto si no hay desglose guardado (registros antiguos):
-      if (esSinColector) {
-        // Traslado + Sin Colector → factor 0.8125; Ruta + Sin Colector → factor 0.775
-        const factor = ingreso.tipo === "Traslado" ? 0.8125 : 0.775;
-        totalRecaudado = montoNeto > 0 ? montoNeto / factor : 0;
-      } else {
-        // Con Colector → factor 0.7675
-        totalRecaudado = montoNeto > 0 ? montoNeto / 0.7675 : 0;
-      }
+      const factor = esSinColector ? (ingreso.tipo === "Traslado" ? 0.8125 : 0.775) : 0.7675;
+      totalRecaudado = montoNeto > 0 ? montoNeto / factor : 0;
     }
 
     if (esSinColector) {
@@ -132,7 +148,7 @@ function DetalleIngresoModal({
 
   const ingresoRegistrado = montoNeto || (esFraternidad ? Math.max(0, (totalRecaudado - gastos) - operador) : totalRecaudado - colector - operador);
 
-  const maxVal = Math.max(...paymentRows.map((r) => r.value), 1);
+  const maxVal = Math.max(...paymentRows.map((r) => (r.isUSD ? dolaresEnBs : r.value)), 1);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -191,7 +207,8 @@ function DetalleIngresoModal({
 
           {paymentRows.map((row) => {
             const Icon = row.icon;
-            const pct = Math.round((row.value / maxVal) * 100);
+            const displayBsVal = row.isUSD ? dolaresEnBs : row.value;
+            const pct = Math.round((displayBsVal / maxVal) * 100);
             return (
               <div key={row.label} className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -199,14 +216,28 @@ function DetalleIngresoModal({
                     <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
                     {row.label}
                   </div>
-                  <span className={`font-mono text-sm font-bold ${row.value > 0 ? row.color : "text-slate-600"}`}>
-                    {row.isUSD ? `$ ${row.value.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD` : formatCurrency(row.value)}
-                  </span>
+                  <div className="text-right">
+                    <span className={`font-mono text-sm font-bold ${row.value > 0 ? row.color : "text-slate-600"}`}>
+                      {row.isUSD
+                        ? `$ ${row.value.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD`
+                        : formatCurrency(row.value)}
+                    </span>
+                    {row.isUSD && row.value > 0 && dolaresEnBs > 0 && (
+                      <p className="text-[11px] font-mono text-emerald-400 font-medium">
+                        ≈ {formatCurrency(dolaresEnBs)}
+                        {tasaBsDolar > 0 && (
+                          <span className="text-slate-500 font-normal ml-1">
+                            ({formatCurrency(tasaBsDolar)}/$)
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${row.value > 0 ? row.bg.replace("bg-", "bg-").replace("/10", "/60") : ""}`}
-                    style={{ width: row.value > 0 ? `${pct}%` : "0%" }}
+                    style={{ width: displayBsVal > 0 ? `${pct}%` : "0%" }}
                   />
                 </div>
               </div>

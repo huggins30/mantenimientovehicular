@@ -117,6 +117,13 @@ BEGIN
   ) THEN
     ALTER TABLE public.ingresos_unidad ADD COLUMN tipo VARCHAR(50) DEFAULT 'Ruta';
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='ingresos_unidad' AND column_name='monto_bs_dolar'
+  ) THEN
+    ALTER TABLE public.ingresos_unidad ADD COLUMN monto_bs_dolar NUMERIC(12,2) DEFAULT 0;
+  END IF;
 END $$;
 
 -- ============================================================
