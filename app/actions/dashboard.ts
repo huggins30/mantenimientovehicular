@@ -101,6 +101,7 @@ export async function getDashboardData(
     mantenimientosRes,
     registrosMantenimientoRes,
     comprasDolaresRes,
+    otrosIngresosRes,
   ] =
     await Promise.all([
       supabase
@@ -150,6 +151,11 @@ export async function getDashboardData(
         .select("cantidad_dolares, costo_bolivares, tasa_cambio, fecha")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id),
+
+      supabase
+        .from("otros_ingresos")
+        .select("tipo_moneda, monto_usd, monto_bs, fecha")
+        .eq("user_id", user.id),
     ]);
 
   // Manejar errores de unidad (crítico)
@@ -179,12 +185,14 @@ export async function getDashboardData(
   const rawMantenimientos = (mantenimientosRes.data ?? []) as MantenimientoAceite[];
   const rawRegistrosMantenimiento = (registrosMantenimientoRes.data ?? []) as RegistroMantenimiento[];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
+  const rawOtrosIngresos = (otrosIngresosRes?.data ?? []) as { tipo_moneda: string; monto_usd: number; monto_bs: number; fecha: string }[];
 
   // Aplicar filtros de fecha si se especificaron
   const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
   const mantenimientos = rawMantenimientos.filter((m) => matchesDateFilter(m.fecha_servicio, filter));
   const registrosMantenimiento = rawRegistrosMantenimiento.filter((r) => matchesDateFilter(r.fecha, filter));
   const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
+  const otrosIngresos = rawOtrosIngresos.filter((o) => matchesDateFilter(o.fecha, filter));
 
   // ---- Cálculos financieros ----
   // Las compras de dólares son operaciones globales de tesorería:
@@ -234,11 +242,19 @@ export async function getDashboardData(
   );
   const totalGastosMantenimiento = totalGastosRepuestos + totalManoObra + totalMantenimientoAceite;
 
-  const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
-  const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
+  // Otros Ingresos (globales del usuario, no por unidad)
+  const totalOtrosIngresosDolares = otrosIngresos
+    .filter((o) => o.tipo_moneda === "USD")
+    .reduce((s, o) => s + (Number(o.monto_usd) || 0), 0);
+  const totalOtrosIngresosBolivares = otrosIngresos
+    .filter((o) => o.tipo_moneda === "BS")
+    .reduce((s, o) => s + (Number(o.monto_bs) || 0), 0);
+
+  const rentabilidadDolares = (totalIngresosDolares + totalOtrosIngresosDolares) - totalGastosMantenimiento;
+  const rentabilidadBolivares = (totalIngresosBolivares + totalOtrosIngresosBolivares) - totalGastosRepuestosBs;
   const rentabilidadNeta = rentabilidadDolares;
   // Rentabilidad en Bs: Ingresos Bs − Gastos directos en Bs
-  const rentabilidadBsDirecta = totalIngresosBolivares - totalGastosBsDirecto;
+  const rentabilidadBsDirecta = (totalIngresosBolivares + totalOtrosIngresosBolivares) - totalGastosBsDirecto;
 
   // Saldo pendiente por pagar: SOLO de registros donde se ingresó un abono (abono > 0) y costo_total > abono
   const totalSaldoPendiente = registrosMantenimiento.reduce((sum, r) => {
@@ -266,6 +282,8 @@ export async function getDashboardData(
     totalGastosBsDirecto,
     rentabilidadBsDirecta,
     totalSaldoPendiente,
+    totalOtrosIngresosDolares,
+    totalOtrosIngresosBolivares,
   };
 
   // ---- Estado del semáforo de aceite ----
@@ -392,6 +410,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     mantenimientosRes,
     registrosMantenimientoRes,
     comprasDolaresRes,
+    otrosIngresosGlobalRes,
   ] = await Promise.all([
     supabase.from("unidades").select("id, placa, marca, modelo, numero_unidad").eq("user_id", user.id),
     supabase.from("ingresos_unidad").select("unidad_id, monto_ingreso, dolares, pago_movil, movi, efectivo, otros, fecha").eq("user_id", user.id),
@@ -399,6 +418,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     supabase.from("mantenimientos_aceite").select("unidad_id, costo_servicio, fecha_servicio").eq("user_id", user.id),
     supabase.from("registros_mantenimiento").select("unidad_id, costo_total, rep_subtotal, mo_costo, costo_bolivares, tasa_cambio, fecha, precio_bs_repuestos, precio_bs_mano_obra, abono").eq("user_id", user.id),
     supabase.from("compras_dolares").select("unidad_id, cantidad_dolares, costo_bolivares, tasa_cambio, fecha").eq("user_id", user.id),
+    supabase.from("otros_ingresos").select("tipo_moneda, monto_usd, monto_bs, fecha").eq("user_id", user.id),
   ]);
 
   const unidades = unidadesRes.data ?? [];
@@ -409,12 +429,14 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const rawMantenimientos = mantenimientosRes.data ?? [];
   const rawRegistrosMantenimiento = registrosMantenimientoRes.data ?? [];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
+  const rawOtrosIngresosGlobal = (otrosIngresosGlobalRes?.data ?? []) as { tipo_moneda: string; monto_usd: number; monto_bs: number; fecha: string }[];
 
   // Aplicar filtros de fecha si se especificaron
   const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
   const mantenimientos = rawMantenimientos.filter((m) => matchesDateFilter(m.fecha_servicio, filter));
   const registrosMantenimiento = rawRegistrosMantenimiento.filter((r) => matchesDateFilter(r.fecha, filter));
   const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
+  const otrosIngresosGlobal = rawOtrosIngresosGlobal.filter((o) => matchesDateFilter(o.fecha, filter));
 
   // Totales globales
   const totalDolaresComprados = comprasDolares.reduce(
@@ -463,12 +485,19 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     return sum;
   }, 0);
 
-  // Rentabilidad global en USD = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$)
-  const rentabilidadDolares = totalIngresosDolares - totalGastosMantenimiento;
-  const rentabilidadBolivares = totalIngresosBolivares - totalGastosRepuestosBs;
+  // Rentabilidad global en USD = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$) + Otros Ingresos$
+  const totalOtrosIngresosDolares = otrosIngresosGlobal
+    .filter((o) => o.tipo_moneda === "USD")
+    .reduce((s, o) => s + (Number(o.monto_usd) || 0), 0);
+  const totalOtrosIngresosBolivares = otrosIngresosGlobal
+    .filter((o) => o.tipo_moneda === "BS")
+    .reduce((s, o) => s + (Number(o.monto_bs) || 0), 0);
+
+  const rentabilidadDolares = (totalIngresosDolares + totalOtrosIngresosDolares) - totalGastosMantenimiento;
+  const rentabilidadBolivares = (totalIngresosBolivares + totalOtrosIngresosBolivares) - totalGastosRepuestosBs;
   const rentabilidadNeta = rentabilidadDolares;
   // Rentabilidad en Bs: Ingresos Bs − Gastos directos en Bs
-  const rentabilidadBsDirecta = totalIngresosBolivares - totalGastosBsDirecto;
+  const rentabilidadBsDirecta = (totalIngresosBolivares + totalOtrosIngresosBolivares) - totalGastosBsDirecto;
 
   // Total saldo pendiente por pagar global: SOLO de registros con abono > 0 y costo_total > abono
   const totalSaldoPendiente = registrosMantenimiento.reduce((sum, r) => {
@@ -576,6 +605,8 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalGastosBsDirecto,
       rentabilidadBsDirecta,
       totalSaldoPendiente,
+      totalOtrosIngresosDolares,
+      totalOtrosIngresosBolivares,
     },
     resumenPorUnidad,
   };

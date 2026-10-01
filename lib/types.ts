@@ -78,6 +78,14 @@ export interface GastoManoObra {
   created_at?: string;
 }
 
+export interface RegistroMantenimientoItem {
+  concepto: string;
+  cantidad: number;
+  costo_unitario: number;
+  subtotal: number;
+  precio_bs_directo?: number;
+}
+
 // -------------------------------------------------------
 // Tabla: registros_mantenimiento
 // Registro unificado de repuesto + mano de obra
@@ -108,6 +116,8 @@ export interface RegistroMantenimiento {
   precio_bs_mano_obra?: number;
   /** Abono / adelanto recibido para este mantenimiento (en USD). Saldo = costo_total - abono */
   abono?: number;
+  /** Lista detallada de repuestos/piezas individuales con cantidades y montos */
+  piezas_detalle?: RegistroMantenimientoItem[] | string;
 }
 
 // -------------------------------------------------------
@@ -162,6 +172,25 @@ export interface IngresoUnidadF {
   otros: number;
   gastos: number;
   ahorro_unidad?: number;
+  created_at?: string;
+}
+
+// -------------------------------------------------------
+// Tabla: otros_ingresos
+// Registro de ingresos adicionales (no de transporte)
+// -------------------------------------------------------
+export interface OtroIngreso {
+  id: number;
+  user_id: string;
+  concepto: string;
+  /** Moneda principal del registro: USD o BS */
+  tipo_moneda: "USD" | "BS";
+  /** Monto en dólares (solo cuando tipo_moneda = 'USD') */
+  monto_usd: number;
+  /** Monto en bolívares (solo cuando tipo_moneda = 'BS') */
+  monto_bs: number;
+  fecha: string; // ISO date string
+  notas?: string | null;
   created_at?: string;
 }
 
@@ -237,6 +266,10 @@ export interface FinancialSummary {
   rentabilidadBsDirecta?: number;
   /** Total de saldos pendientes por pagar ($) = Solo mantenimientos y repuestos con abono registrado (abono > 0 y costo_total > abono) */
   totalSaldoPendiente?: number;
+  /** Total de otros ingresos en dólares */
+  totalOtrosIngresosDolares?: number;
+  /** Total de otros ingresos en bolívares */
+  totalOtrosIngresosBolivares?: number;
 }
 
 /** Datos completos que carga el dashboard */

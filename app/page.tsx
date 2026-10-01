@@ -43,9 +43,12 @@ import { UnitSwitcher } from "@/components/dashboard/UnitSwitcher";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { ReporteMantenimiento } from "@/components/dashboard/ReporteMantenimiento";
+import { OtrosIngresosForm } from "@/components/forms/OtrosIngresosForm";
+import { OtrosIngresosTable } from "@/components/dashboard/OtrosIngresosTable";
 import { getAllComprasDolares } from "@/app/actions/dolares";
 import { getChoferPerformanceData } from "@/app/actions/chofer";
-import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite } from "@/lib/types";
+import { getOtrosIngresos } from "@/app/actions/otros_ingresos";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite, OtroIngreso } from "@/lib/types";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -167,7 +170,7 @@ export default async function DashboardPage({
   try {
     if (activeTab === "general" || activeTab === "dolares" || activeTab === "chofer") {
       globalData = await getGlobalDashboardData(dateFilter);
-    } else if (activeTab !== "nueva-unidad") {
+    } else if (activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos") {
       dashboardData = await getDashboardData(activeUnidadId, dateFilter);
     }
   } catch (err) {
@@ -186,7 +189,13 @@ export default async function DashboardPage({
     choferData = await getChoferPerformanceData(dateFilter);
   }
 
-  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad")) {
+  // Otros Ingresos
+  let otrosIngresos: OtroIngreso[] = [];
+  if (activeTab === "otros-ingresos" && !error) {
+    otrosIngresos = await getOtrosIngresos(dateFilter);
+  }
+
+  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos")) {
     return (
       <main className="min-h-screen bg-background text-white">
         {ErrorHeader}
@@ -287,6 +296,7 @@ export default async function DashboardPage({
                   {activeTab === "dolares" && "Compra de Dólares — Todas las Unidades"}
                   {activeTab === "chofer" && "Rendimiento de Operadores (Chofer)"}
                   {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
+                  {activeTab === "otros-ingresos" && "Otros Ingresos"}
                   {activeTab === "resumen" && `Resumen: ${unidad?.numero_unidad ? (unidad.numero_unidad.toLowerCase().includes("unidad") ? unidad.numero_unidad : `Unidad ${unidad.numero_unidad}`) : unidad?.placa}`}
                   {activeTab === "aceite" && `Control de Aceite: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.numero_unidad || unidad?.placa}`}
@@ -304,13 +314,15 @@ export default async function DashboardPage({
                     ? `Control de ingresos por operador y unidad para evaluar su rendimiento (${unidades.length} vehículos).`
                     : activeTab === "nueva-unidad"
                     ? "Agrega los datos de la nueva unidad asignada."
+                    : activeTab === "otros-ingresos"
+                    ? "Registra y revisa ingresos adicionales en dólares o bolívares. Se suman al Resumen Financiero."
                     : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio}) · ${unidad?.placa}`
                   }
                 </p>
               </div>
 
               {/* Filtro por fecha única y por rango de fechas */}
-              {(activeTab === "general" || activeTab === "resumen" || activeTab === "chofer") && (
+              {(activeTab === "general" || activeTab === "resumen" || activeTab === "chofer" || activeTab === "otros-ingresos") && (
                 <div className="shrink-0">
                   <DateFilterBar />
                 </div>
@@ -639,6 +651,28 @@ export default async function DashboardPage({
                       badgeText="Por Pagar"
                       subtitle="Solo de abonos en mantenimiento y repuestos"
                     />
+                    {(financialSummary.totalOtrosIngresosDolares ?? 0) > 0 && (
+                      <FinancialSummaryCard
+                        title="Otros Ingresos $"
+                        amount={financialSummary.totalOtrosIngresosDolares ?? 0}
+                        icon={Wallet}
+                        variant="income"
+                        currency="USD"
+                        badgeText="Extra"
+                        subtitle="Ingresos adicionales en USD"
+                      />
+                    )}
+                    {(financialSummary.totalOtrosIngresosBolivares ?? 0) > 0 && (
+                      <FinancialSummaryCard
+                        title="Otros Ingresos Bs"
+                        amount={financialSummary.totalOtrosIngresosBolivares ?? 0}
+                        icon={Wallet}
+                        variant="income"
+                        currency="BS"
+                        badgeText="Extra"
+                        subtitle="Ingresos adicionales en Bs"
+                      />
+                    )}
                   </div>
                 </section>
 
@@ -799,6 +833,26 @@ export default async function DashboardPage({
                       ingresos={ultimosIngresos as IngresoUnidad[]}
                       totalBsUsadosCompras={financialSummary?.totalBsUsadosCompras ?? 0}
                     />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* TAB: OTROS INGRESOS */}
+            {activeTab === "otros-ingresos" && (
+              <section>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Registrar Ingreso
+                    </h3>
+                    <OtrosIngresosForm />
+                  </div>
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Historial de Otros Ingresos
+                    </h3>
+                    <OtrosIngresosTable registros={otrosIngresos as OtroIngreso[]} />
                   </div>
                 </div>
               </section>

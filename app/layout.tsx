@@ -8,7 +8,11 @@ export const metadata: Metadata = {
   keywords: ["mantenimiento vehicular", "cambio de aceite", "gestión de flota", "finanzas"],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="es" className="h-full">
       <body className="min-h-full flex flex-col bg-background antialiased">

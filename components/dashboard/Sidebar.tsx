@@ -16,6 +16,7 @@ import {
   DollarSign,
   UserCheck,
   ClipboardList,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -54,6 +55,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       label: "Ingresos Diarios",
       icon: TrendingUp,
       description: "Registro de fletes y viajes",
+    },
+    {
+      id: "otros-ingresos",
+      label: "Otros Ingresos",
+      icon: Wallet,
+      description: "Ingresos adicionales",
     },
     {
       id: "repuestos",

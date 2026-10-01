@@ -23,7 +23,7 @@ export async function registrarMantenimientoAction(
   const unidadId       = Number(formData.get("unidad_id"));
   const fecha          = String(formData.get("fecha") ?? "");
   const proveedor      = String(formData.get("proveedor") ?? "").trim();
-  const notas          = String(formData.get("notas") ?? "").trim();
+  let notas            = String(formData.get("notas") ?? "").trim();
 
   // ── Repuestos (Múltiples piezas o individual) ────────────
   const piezasJson     = formData.get("piezas_json") as string | null;
@@ -71,33 +71,37 @@ export async function registrarMantenimientoAction(
       }>;
 
       if (piezasList.length > 0) {
-        const nombresValidos = piezasList
+        const itemsValidos = piezasList
           .filter((p) => p.concepto.trim() !== "")
           .map((p) => {
             const cant = Math.max(1, parseInt(String(p.cantidad)) || 1);
-            return cant > 1 ? `${p.concepto.trim()} (x${cant})` : p.concepto.trim();
+            const cUSD = Math.max(0, parseFloat(String(p.costoUSD)) || 0);
+            const cBsDir = Math.max(0, parseFloat(String(p.precioBsDirecto || "")) || 0);
+            return {
+              concepto: p.concepto.trim(),
+              cantidad: cant,
+              costo_unitario: Number(cUSD.toFixed(2)),
+              subtotal: Number((cant * cUSD).toFixed(2)),
+              precio_bs_directo: Number((cant * cBsDir).toFixed(2)),
+            };
           });
 
-        if (nombresValidos.length === 0) {
+        if (itemsValidos.length === 0) {
           return { success: false, error: "Debe ingresar el nombre de al menos una pieza." };
         }
 
-        repConcepto = nombresValidos.join(", ");
+        repConcepto = itemsValidos
+          .map((p) => (p.cantidad > 1 ? `${p.concepto} (x${p.cantidad})` : p.concepto))
+          .join(", ");
+
         let totalCount = 0;
         let totalUSD = 0;
         let totalBsDirectoFromItems = 0;
 
-        for (const p of piezasList) {
-          if (!p.concepto.trim()) continue;
-          const cant = Math.max(1, parseInt(String(p.cantidad)) || 1);
-          const cUSD = parseFloat(p.costoUSD) || 0;
-          const cBs = parseFloat(p.costoBs) || 0;
-          const cBsDir = parseFloat(p.precioBsDirecto || "") || 0;
-          // Solo el costo USD afecta el total en dólares (Bs ya no se convierte)
-          const unitUSD = cUSD;
-          totalUSD += cant * unitUSD;
-          totalCount += cant;
-          totalBsDirectoFromItems += cant * cBsDir;
+        for (const it of itemsValidos) {
+          totalUSD += it.subtotal;
+          totalCount += it.cantidad;
+          totalBsDirectoFromItems += it.precio_bs_directo;
         }
 
         repCantidad = totalCount > 0 ? totalCount : 1;
@@ -107,6 +111,10 @@ export async function registrarMantenimientoAction(
         if (precioBsRepuestos <= 0 && totalBsDirectoFromItems > 0) {
           precioBsRepuestos = totalBsDirectoFromItems;
         }
+
+        // Serializar lista estructurada de gastos de repuestos
+        const jsonTag = `<!--ITEMS_JSON:${JSON.stringify(itemsValidos)}-->`;
+        notas = notas ? `${notas}\n\n${jsonTag}` : jsonTag;
       }
     } catch {
       // Si falla el parse, continuará con los campos individuales
