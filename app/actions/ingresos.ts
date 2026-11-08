@@ -131,19 +131,21 @@ export async function registrarIngresoAction(
     return { success: false, error: `Error al guardar el ingreso: ${error.message}` };
   }
 
-  // Actualizar el kilometraje de la unidad si es mayor
-  if (kilometrajeActual) {
+  // Actualizar el kilometraje de la unidad
+  if (kilometrajeActual && kilometrajeActual > 0) {
     const { data: unidad } = await supabase
       .from("unidades")
       .select("kilometraje_actual")
       .eq("id", unidadId)
+      .eq("user_id", user.id)
       .single();
       
-    if (unidad && kilometrajeActual > (unidad.kilometraje_actual || 0)) {
+    if (unidad && kilometrajeActual >= (unidad.kilometraje_actual || 0)) {
       await supabase
         .from("unidades")
         .update({ kilometraje_actual: kilometrajeActual })
-        .eq("id", unidadId);
+        .eq("id", unidadId)
+        .eq("user_id", user.id);
     }
   }
 
@@ -231,19 +233,21 @@ export async function registrarIngresoFraternidadAction(
     return { success: false, error: `Error al guardar el ingreso en Fraternidad: ${error.message}` };
   }
 
-  // Actualizar el kilometraje de la unidad si es mayor
-  if (kilometrajeActual) {
+  // Actualizar el kilometraje de la unidad
+  if (kilometrajeActual && kilometrajeActual > 0) {
     const { data: unidad } = await supabase
       .from("unidades")
       .select("kilometraje_actual")
       .eq("id", unidadId)
+      .eq("user_id", user.id)
       .single();
       
-    if (unidad && kilometrajeActual > (unidad.kilometraje_actual || 0)) {
+    if (unidad && kilometrajeActual >= (unidad.kilometraje_actual || 0)) {
       await supabase
         .from("unidades")
         .update({ kilometraje_actual: kilometrajeActual })
-        .eq("id", unidadId);
+        .eq("id", unidadId)
+        .eq("user_id", user.id);
     }
   }
 

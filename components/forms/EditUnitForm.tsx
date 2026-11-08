@@ -143,6 +143,7 @@ export function EditUnitForm({ unidad }: EditUnitFormProps) {
             >
               <option value="Unidad Comun" className="bg-[#16162a] text-white">Unidad Comun</option>
               <option value="Fraternidad" className="bg-[#16162a] text-white">Fraternidad</option>
+              <option value="Otra" className="bg-[#16162a] text-white">Otra</option>
             </select>
           </div>
         </div>

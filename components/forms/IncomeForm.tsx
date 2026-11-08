@@ -144,6 +144,11 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
     }
   }, [unidad.kilometraje_actual]);
 
+  const kmBase = Number(unidad.kilometraje_actual) || 0;
+  const numKilometrajeIngresado = kilometrajeActual === "" ? NaN : Number(kilometrajeActual);
+  const tieneKmValido = !isNaN(numKilometrajeIngresado) && kilometrajeActual !== "";
+  const restaKilometraje = tieneKmValido ? numKilometrajeIngresado - kmBase : 0;
+
   const totalConversion = (values.dolares || 0) * (values.monto_bs_dolar || 0);
   const total =
     (values.pago_movil || 0) +
@@ -257,9 +262,14 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
           </div>
 
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
-            <label htmlFor="kilometraje_actual" className="block text-xs font-medium text-slate-400">
-              Kilometraje Actual <span className="text-red-400">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="kilometraje_actual" className="block text-xs font-medium text-slate-300">
+                Kilometraje de Llegada <span className="text-red-400">*</span>
+              </label>
+              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
+                Actual: <strong className="text-emerald-400 font-semibold">{kmBase.toLocaleString()} km</strong>
+              </span>
+            </div>
             <div className="relative">
               <Gauge className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
               <input
@@ -268,11 +278,76 @@ function IncomeFormComun({ unidad }: IncomeFormProps) {
                 type="number"
                 value={kilometrajeActual}
                 onChange={(e) => setKilometrajeActual(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 required
-                placeholder="Ej: 150000"
-                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
+                min="0"
+                placeholder={kmBase > 0 ? `Ej: ${kmBase + 100}` : "Ej: 50000"}
+                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40"
               />
             </div>
+
+            {/* Resultado de la resta de ambos kilometrajes */}
+            {tieneKmValido && (
+              <div
+                className={`rounded-xl border p-2 text-xs transition-all ${
+                  restaKilometraje > 0
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : restaKilometraje === 0
+                    ? "border-white/10 bg-white/5 text-slate-400"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                    {restaKilometraje > 0 ? (
+                      <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    ) : (
+                      <Gauge className="h-3 w-3" />
+                    )}
+                    Resta:
+                  </span>
+                  <span
+                    className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs ${
+                      restaKilometraje > 0
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : restaKilometraje === 0
+                        ? "bg-white/10 text-slate-300"
+                        : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    }`}
+                  >
+                    {restaKilometraje > 0 ? `+${restaKilometraje.toLocaleString()} km recorridos` : `${restaKilometraje.toLocaleString()} km`}
+                  </span>
+                </div>
+
+                <div className="mt-1 flex items-center justify-between text-[10px] font-mono border-t border-white/5 pt-1">
+                  <span className="text-slate-400">
+                    {numKilometrajeIngresado.toLocaleString()} km − {kmBase.toLocaleString()} km
+                  </span>
+                  <span className="font-sans">
+                    {restaKilometraje > 0 ? (
+                      <span className="text-emerald-400 font-medium">✓ Actualiza bus a {numKilometrajeIngresado.toLocaleString()} km</span>
+                    ) : restaKilometraje === 0 ? (
+                      <span className="text-slate-400">Sin cambio</span>
+                    ) : (
+                      <span className="text-amber-400 font-medium">Menor al actual</span>
+                    )}
+                  </span>
+                </div>
+
+                {numKilometrajeIngresado > 0 && numKilometrajeIngresado < 2000 && kmBase >= 10000 && (
+                  <div className="mt-1.5 pt-1 border-t border-amber-500/20 flex items-center justify-between text-[10px]">
+                    <span className="text-amber-400/90">¿Ingresaste solo el recorrido?</span>
+                    <button
+                      type="button"
+                      onClick={() => setKilometrajeActual(kmBase + numKilometrajeIngresado)}
+                      className="font-bold underline text-amber-300 hover:text-white cursor-pointer"
+                    >
+                      Sumar: {(kmBase + numKilometrajeIngresado).toLocaleString()} km
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
@@ -561,6 +636,11 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
     }
   }, [unidad.kilometraje_actual]);
 
+  const kmBase = Number(unidad.kilometraje_actual) || 0;
+  const numKilometrajeIngresado = kilometrajeActual === "" ? NaN : Number(kilometrajeActual);
+  const tieneKmValido = !isNaN(numKilometrajeIngresado) && kilometrajeActual !== "";
+  const restaKilometraje = tieneKmValido ? numKilometrajeIngresado - kmBase : 0;
+
   const totalConversion = (values.dolares || 0) * (values.monto_bs_dolar || 0);
   const totalRecaudado =
     (values.pago_movil || 0) +
@@ -659,9 +739,14 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
           </div>
 
           <div className="space-y-1.5 col-span-2 sm:col-span-1">
-            <label htmlFor="kilometraje_actual_f" className="block text-xs font-medium text-slate-400">
-              Kilometraje Actual <span className="text-red-400">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="kilometraje_actual_f" className="block text-xs font-medium text-slate-300">
+                Kilometraje de Llegada <span className="text-red-400">*</span>
+              </label>
+              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
+                Actual: <strong className="text-violet-400 font-semibold">{kmBase.toLocaleString()} km</strong>
+              </span>
+            </div>
             <div className="relative">
               <Gauge className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
               <input
@@ -670,11 +755,76 @@ function IncomeFormFraternidad({ unidad }: IncomeFormProps) {
                 type="number"
                 value={kilometrajeActual}
                 onChange={(e) => setKilometrajeActual(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 required
-                placeholder="Ej: 150000"
-                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
+                min="0"
+                placeholder={kmBase > 0 ? `Ej: ${kmBase + 100}` : "Ej: 50000"}
+                className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40"
               />
             </div>
+
+            {/* Resultado de la resta de ambos kilometrajes */}
+            {tieneKmValido && (
+              <div
+                className={`rounded-xl border p-2 text-xs transition-all ${
+                  restaKilometraje > 0
+                    ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+                    : restaKilometraje === 0
+                    ? "border-white/10 bg-white/5 text-slate-400"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                    {restaKilometraje > 0 ? (
+                      <span className="flex h-2 w-2 rounded-full bg-violet-400 animate-pulse" />
+                    ) : (
+                      <Gauge className="h-3 w-3" />
+                    )}
+                    Resta:
+                  </span>
+                  <span
+                    className={`font-mono font-bold px-2 py-0.5 rounded-md text-xs ${
+                      restaKilometraje > 0
+                        ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                        : restaKilometraje === 0
+                        ? "bg-white/10 text-slate-300"
+                        : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    }`}
+                  >
+                    {restaKilometraje > 0 ? `+${restaKilometraje.toLocaleString()} km recorridos` : `${restaKilometraje.toLocaleString()} km`}
+                  </span>
+                </div>
+
+                <div className="mt-1 flex items-center justify-between text-[10px] font-mono border-t border-white/5 pt-1">
+                  <span className="text-slate-400">
+                    {numKilometrajeIngresado.toLocaleString()} km − {kmBase.toLocaleString()} km
+                  </span>
+                  <span className="font-sans">
+                    {restaKilometraje > 0 ? (
+                      <span className="text-violet-400 font-medium">✓ Actualiza bus a {numKilometrajeIngresado.toLocaleString()} km</span>
+                    ) : restaKilometraje === 0 ? (
+                      <span className="text-slate-400">Sin cambio</span>
+                    ) : (
+                      <span className="text-amber-400 font-medium">Menor al actual</span>
+                    )}
+                  </span>
+                </div>
+
+                {numKilometrajeIngresado > 0 && numKilometrajeIngresado < 2000 && kmBase >= 10000 && (
+                  <div className="mt-1.5 pt-1 border-t border-amber-500/20 flex items-center justify-between text-[10px]">
+                    <span className="text-amber-400/90">¿Ingresaste solo el recorrido?</span>
+                    <button
+                      type="button"
+                      onClick={() => setKilometrajeActual(kmBase + numKilometrajeIngresado)}
+                      className="font-bold underline text-amber-300 hover:text-white cursor-pointer"
+                    >
+                      Sumar: {(kmBase + numKilometrajeIngresado).toLocaleString()} km
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5 col-span-2 sm:col-span-1">

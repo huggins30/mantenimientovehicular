@@ -18,6 +18,7 @@ import {
   Hammer,
   Banknote,
   AlertCircle,
+  EyeOff,
 } from "lucide-react";
 import type { ResumenPorUnidad } from "@/app/actions/dashboard";
 
@@ -165,6 +166,16 @@ function ReporteModal({
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Aviso unidades "Otra" */}
+        {row.tipo_unidad === "Otra" && (
+          <div className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+            <EyeOff className="h-4 w-4 text-yellow-400 shrink-0" />
+            <p className="text-xs text-yellow-300 font-medium">
+              Esta unidad es de tipo <strong>Otra</strong> — sus ingresos y egresos <strong>no se incluyen</strong> en el Resumen General de la flota.
+            </p>
+          </div>
+        )}
 
         {/* Contenido */}
         <div className="px-6 py-5 space-y-5">
@@ -316,8 +327,10 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
     );
   }
 
-  const totalDolares = resumen.reduce((s, r) => s + (r.totalIngresosDolares ?? 0), 0);
-  const totalBolivares = resumen.reduce((s, r) => s + (r.totalIngresosBolivares ?? 0), 0);
+  // Los totales del pie de tabla excluyen las unidades tipo "Otra" (igual que el Resumen General)
+  const resumenSinOtra = resumen.filter((r) => r.tipo_unidad !== "Otra");
+  const totalDolares = resumenSinOtra.reduce((s, r) => s + (r.totalIngresosDolares ?? 0), 0);
+  const totalBolivares = resumenSinOtra.reduce((s, r) => s + (r.totalIngresosBolivares ?? 0), 0);
 
   return (
     <>
@@ -351,13 +364,21 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                           <Car className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
                         </div>
                         <div>
-                          <p className="font-bold text-white tracking-wide">
-                            {row.numero_unidad
-                              ? (row.numero_unidad.toLowerCase().includes("unidad")
-                                  ? row.numero_unidad
-                                  : `Unidad ${row.numero_unidad}`)
-                              : row.placa}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-white tracking-wide">
+                              {row.numero_unidad
+                                ? (row.numero_unidad.toLowerCase().includes("unidad")
+                                    ? row.numero_unidad
+                                    : `Unidad ${row.numero_unidad}`)
+                                : row.placa}
+                            </p>
+                            {row.tipo_unidad === "Otra" && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-300" title="No se suma al Resumen General">
+                                <EyeOff className="h-2.5 w-2.5" />
+                                Otra
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-500">{row.placa} · {row.marca} {row.modelo}</p>
                         </div>
                       </div>
@@ -440,6 +461,11 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
               <tr>
                 <td className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">
                   Total Flota
+                  {resumen.some((r) => r.tipo_unidad === "Otra") && (
+                    <span className="ml-1.5 inline-flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-1 py-0.5 text-[9px] text-yellow-400 font-semibold" title="Las unidades tipo Otra están excluidas de estos totales">
+                      <EyeOff className="h-2 w-2" />excl. Otra
+                    </span>
+                  )}
                 </td>
 
                 {/* Totales de Ingresos en Dólares y en Bolívares */}
@@ -453,20 +479,20 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                 </td>
 
                 <td className="px-5 py-4 text-right font-mono font-bold text-red-300 text-sm whitespace-nowrap">
-                  {formatUSD(resumen.reduce((s, r) => s + r.totalGastosRepuestos, 0))}
+                  {formatUSD(resumenSinOtra.reduce((s, r) => s + r.totalGastosRepuestos, 0))}
                 </td>
                 <td className="px-5 py-4 text-right font-mono font-bold text-amber-300 text-sm whitespace-nowrap">
-                  {formatUSD(resumen.reduce((s, r) => s + r.totalMantenimientoAceite, 0))}
+                  {formatUSD(resumenSinOtra.reduce((s, r) => s + r.totalMantenimientoAceite, 0))}
                 </td>
                 <td className="px-5 py-4 text-right font-mono font-bold text-orange-300 text-sm whitespace-nowrap">
-                  {formatUSD(resumen.reduce((s, r) => s + r.totalManoObra, 0))}
+                  {formatUSD(resumenSinOtra.reduce((s, r) => s + r.totalManoObra, 0))}
                 </td>
                 {/* Total Rentabilidad Flota en Dólares y en Bolívares */}
                 <td className="px-5 py-4 text-right whitespace-nowrap">
                   <div className="flex flex-col items-end gap-1">
                     {(() => {
-                      const totDolares = resumen.reduce((s, r) => s + (r.rentabilidadDolares ?? 0), 0);
-                      const totBs = resumen.reduce((s, r) => s + (r.rentabilidadBolivares ?? 0), 0);
+                      const totDolares = resumenSinOtra.reduce((s, r) => s + (r.rentabilidadDolares ?? 0), 0);
+                      const totBs = resumenSinOtra.reduce((s, r) => s + (r.rentabilidadBolivares ?? 0), 0);
                       return (
                         <>
                           <div
@@ -494,7 +520,7 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                 </td>
                 <td className="px-5 py-4 text-center">
                   {(() => {
-                    const totPendiente = resumen.reduce((s, r) => s + (r.totalSaldoPendiente ?? 0), 0);
+                    const totPendiente = resumenSinOtra.reduce((s, r) => s + (r.totalSaldoPendiente ?? 0), 0);
                     if (totPendiente <= 0) return null;
                     return (
                       <span className="inline-block font-mono text-[10px] text-amber-300 font-bold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20" title="Total deuda flota">

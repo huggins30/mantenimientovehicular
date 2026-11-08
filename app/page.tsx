@@ -5,6 +5,7 @@
 
 import {
   TrendingUp,
+  TrendingDown,
   Wrench,
   ShoppingCart,
   BarChart3,
@@ -25,7 +26,7 @@ import { getDashboardData, getGlobalDashboardData, getUnidadesUsuario } from "@/
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { signOutAction } from "@/app/actions/auth";
 import { getPerfilUsuario } from "@/app/actions/admin";
-import { FinancialSummaryCard } from "@/components/dashboard/FinancialSummaryCard";
+import { FinancialMetricsGrid } from "@/components/dashboard/FinancialMetricsGrid";
 import { UpdateMileageCard } from "@/components/dashboard/UpdateMileageCard";
 import { OilChangeWidget } from "@/components/dashboard/OilChangeWidget";
 import { OilChangeForm } from "@/components/forms/OilChangeForm";
@@ -45,10 +46,13 @@ import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { ReporteMantenimiento } from "@/components/dashboard/ReporteMantenimiento";
 import { OtrosIngresosForm } from "@/components/forms/OtrosIngresosForm";
 import { OtrosIngresosTable } from "@/components/dashboard/OtrosIngresosTable";
+import { OtrosEgresosForm } from "@/components/forms/OtrosEgresosForm";
+import { OtrosEgresosTable } from "@/components/dashboard/OtrosEgresosTable";
 import { getAllComprasDolares } from "@/app/actions/dolares";
 import { getChoferPerformanceData } from "@/app/actions/chofer";
 import { getOtrosIngresos } from "@/app/actions/otros_ingresos";
-import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite, OtroIngreso } from "@/lib/types";
+import { getOtrosEgresos } from "@/app/actions/otros_egresos";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite, OtroIngreso, OtroEgreso } from "@/lib/types";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -170,7 +174,7 @@ export default async function DashboardPage({
   try {
     if (activeTab === "general" || activeTab === "dolares" || activeTab === "chofer") {
       globalData = await getGlobalDashboardData(dateFilter);
-    } else if (activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos") {
+    } else if (activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos" && activeTab !== "otros-egresos") {
       dashboardData = await getDashboardData(activeUnidadId, dateFilter);
     }
   } catch (err) {
@@ -195,7 +199,13 @@ export default async function DashboardPage({
     otrosIngresos = await getOtrosIngresos(dateFilter);
   }
 
-  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos")) {
+  // Otros Egresos
+  let otrosEgresos: OtroEgreso[] = [];
+  if (activeTab === "otros-egresos" && !error) {
+    otrosEgresos = await getOtrosEgresos(dateFilter);
+  }
+
+  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos" && activeTab !== "otros-egresos")) {
     return (
       <main className="min-h-screen bg-background text-white">
         {ErrorHeader}
@@ -297,6 +307,7 @@ export default async function DashboardPage({
                   {activeTab === "chofer" && "Rendimiento de Operadores (Chofer)"}
                   {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
                   {activeTab === "otros-ingresos" && "Otros Ingresos"}
+                  {activeTab === "otros-egresos" && "Otros Egresos"}
                   {activeTab === "resumen" && `Resumen: ${unidad?.numero_unidad ? (unidad.numero_unidad.toLowerCase().includes("unidad") ? unidad.numero_unidad : `Unidad ${unidad.numero_unidad}`) : unidad?.placa}`}
                   {activeTab === "aceite" && `Control de Aceite: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.numero_unidad || unidad?.placa}`}
@@ -315,14 +326,16 @@ export default async function DashboardPage({
                     : activeTab === "nueva-unidad"
                     ? "Agrega los datos de la nueva unidad asignada."
                     : activeTab === "otros-ingresos"
-                    ? "Registra y revisa ingresos adicionales en dólares o bolívares. Se suman al Resumen Financiero."
+                    ? "Registra y revisa ingresos adicionales en dólares o bolívares. Se suman al Resumen de Unidad."
+                    : activeTab === "otros-egresos"
+                    ? "Registra y revisa egresos y gastos adicionales en dólares o bolívares. Se descuentan del Resumen de Unidad y General."
                     : `Vehículo ${unidad?.marca} ${unidad?.modelo} (${unidad?.anio}) · ${unidad?.placa}`
                   }
                 </p>
               </div>
 
               {/* Filtro por fecha única y por rango de fechas */}
-              {(activeTab === "general" || activeTab === "resumen" || activeTab === "chofer" || activeTab === "otros-ingresos") && (
+              {(activeTab === "general" || activeTab === "resumen" || activeTab === "chofer" || activeTab === "otros-ingresos" || activeTab === "otros-egresos") && (
                 <div className="shrink-0">
                   <DateFilterBar />
                 </div>
@@ -343,99 +356,13 @@ export default async function DashboardPage({
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Métricas Globales (Toda la Flota)
                   </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <FinancialSummaryCard
-                      title="Ingresos en Dólares"
-                      amount={globalData.financialSummary.totalIngresosDolares}
-                      icon={DollarSign}
-                      variant="income"
-                      currency="USD"
-                      badgeText="Dólares"
-                      subtitle={
-                        (globalData.financialSummary.totalDolaresComprados ?? 0) > 0
-                          ? "Divisas recaudadas y compras ($)"
-                          : "Divisas recaudadas ($)"
-                      }
-                    />
-                    <FinancialSummaryCard
-                      title="Ingresos en Bolívares"
-                      amount={globalData.financialSummary.totalIngresosBolivares}
-                      icon={Banknote}
-                      variant="income"
-                      currency="BS"
-                      badgeText="Bolívares"
-                      subtitle={
-                        (globalData.financialSummary.totalBsUsadosCompras ?? 0) > 0
-                          ? "Neto tras compra de divisas"
-                          : "Total ingreso registrado en Bs"
-                      }
-                    />
-                    <FinancialSummaryCard
-                      title="Gastos en Repuestos"
-                      amount={globalData.financialSummary.totalGastosRepuestos}
-                      icon={ShoppingCart}
-                      variant="expense"
-                      currency="USD"
-                      subtitle="Compras acumuladas"
-                    />
-                    <FinancialSummaryCard
-                      title="Gastos en Bs (Directo)"
-                      amount={globalData.financialSummary.totalGastosBsDirecto ?? 0}
-                      icon={Banknote}
-                      variant="expense"
-                      currency="BS"
-                      badgeText="Gastos Bs"
-                      subtitle="Precio Bs directo acumulado"
-                    />
-                    <FinancialSummaryCard
-                      title="Mantenimiento Aceite"
-                      amount={globalData.financialSummary.totalMantenimientoAceite}
-                      icon={Wrench}
-                      variant="maintenance"
-                      currency="USD"
-                      subtitle="Servicios de todas las unidades"
-                    />
-                    <FinancialSummaryCard
-                      title="Mano de Obra"
-                      amount={globalData.financialSummary.totalManoObra}
-                      icon={Hammer}
-                      variant="labor"
-                      currency="USD"
-                      subtitle="Servicios mecánicos acumulados"
-                    />
-                    <FinancialSummaryCard
-                      title="Rentabilidad Global"
-                      amount={globalData.financialSummary.rentabilidadDolares}
-                      icon={BarChart3}
-                      variant="profit"
-                      currency="USD"
-                      badgeText="Neto"
-                      secondaryAmount={{
-                        label: "En Bolívares",
-                        amount: globalData.financialSummary.rentabilidadBolivares,
-                        currency: "BS",
-                      }}
-                      subtitle="Balance de toda la flota"
-                    />
-                    <FinancialSummaryCard
-                      title="Rentabilidad en Bs"
-                      amount={globalData.financialSummary.rentabilidadBsDirecta ?? 0}
-                      icon={TrendingUp}
-                      variant="profit"
-                      currency="BS"
-                      badgeText="Bs Neto"
-                      subtitle="Ingresos Bs − Gastos Bs directos"
-                    />
-                    <FinancialSummaryCard
-                      title="Saldos Pendientes"
-                      amount={globalData.financialSummary.totalSaldoPendiente ?? 0}
-                      icon={AlertCircle}
-                      variant="debt"
-                      currency="USD"
-                      badgeText="Por Pagar"
-                      subtitle="Solo de abonos en mantenimiento y repuestos"
-                    />
-                  </div>
+                  <FinancialMetricsGrid
+                    summary={globalData.financialSummary}
+                    isGlobal={true}
+                    unidades={unidades}
+                    movimientos={globalData.movimientos || {}}
+                    resumenPorUnidad={globalData.resumenPorUnidad || []}
+                  />
                 </section>
 
                 <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
@@ -479,6 +406,14 @@ export default async function DashboardPage({
                         </span>
                       </div>
                     </div>
+                    {(globalData.financialSummary.totalOtrosEgresosDolares ?? 0) > 0 && (
+                      <>
+                        <span className="text-slate-500 font-bold">−</span>
+                        <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-rose-300 font-mono font-semibold" title="Otros egresos en dólares">
+                          {formatUSD(globalData.financialSummary.totalOtrosEgresosDolares ?? 0)}
+                        </div>
+                      </>
+                    )}
                     <span className="text-slate-500 font-bold">=</span>
                     <div
                       className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
@@ -503,6 +438,14 @@ export default async function DashboardPage({
                         {formatBs(globalData.financialSummary.totalGastosRepuestosBs ?? 0)}
                       </span>
                     </div>
+                    {(globalData.financialSummary.totalOtrosEgresosBolivares ?? 0) > 0 && (
+                      <>
+                        <span className="text-slate-500 font-bold">−</span>
+                        <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-rose-300 font-mono font-semibold" title="Otros egresos en bolívares">
+                          {formatBs(globalData.financialSummary.totalOtrosEgresosBolivares ?? 0)}
+                        </div>
+                      </>
+                    )}
                     <span className="text-slate-500 font-bold">=</span>
                     <div
                       className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
@@ -545,135 +488,32 @@ export default async function DashboardPage({
 
                 <section>
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Resumen Financiero por Unidad
+                    Resumen por Unidad
                   </h3>
                   <GlobalUnitSummaryTable resumen={globalData.resumenPorUnidad} />
                 </section>
               </>
             )}
 
-            {/* TAB: RESUMEN FINANCIERO */}
+            {/* TAB: RESUMEN DE UNIDAD */}
             {activeTab === "resumen" && (
               <>
                 <section>
                   <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Métricas Globales
                   </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <FinancialSummaryCard
-                      title="Ingresos en Dólares"
-                      amount={financialSummary.totalIngresosDolares}
-                      icon={DollarSign}
-                      variant="income"
-                      currency="USD"
-                      badgeText="Dólares"
-                      subtitle={
-                        (financialSummary.totalDolaresComprados ?? 0) > 0
-                          ? "Fletes, pasajes y compras ($)"
-                          : "Fletes y pasajes en divisas ($)"
-                      }
-                    />
-                    <FinancialSummaryCard
-                      title="Ingresos en Bolívares"
-                      amount={financialSummary.totalIngresosBolivares}
-                      icon={Banknote}
-                      variant="income"
-                      currency="BS"
-                      badgeText="Bolívares"
-                      subtitle={
-                        (financialSummary.totalBsUsadosCompras ?? 0) > 0
-                          ? "Neto tras compra de divisas"
-                          : "Total ingreso registrado en Bs"
-                      }
-                    />
-                    <FinancialSummaryCard
-                      title="Gastos en Repuestos"
-                      amount={financialSummary.totalGastosRepuestos}
-                      icon={ShoppingCart}
-                      variant="expense"
-                      currency="USD"
-                      subtitle="Compras acumuladas"
-                    />
-                    <FinancialSummaryCard
-                      title="Gastos en Bs (Directo)"
-                      amount={financialSummary.totalGastosBsDirecto ?? 0}
-                      icon={Banknote}
-                      variant="expense"
-                      currency="BS"
-                      badgeText="Gastos Bs"
-                      subtitle="Precio Bs directo acumulado"
-                    />
-                    <FinancialSummaryCard
-                      title="Mantenimiento Aceite"
-                      amount={financialSummary.totalMantenimientoAceite}
-                      icon={Wrench}
-                      variant="maintenance"
-                      currency="USD"
-                      subtitle="Cambios realizados"
-                    />
-                    <FinancialSummaryCard
-                      title="Mano de Obra"
-                      amount={financialSummary.totalManoObra}
-                      icon={Hammer}
-                      variant="labor"
-                      currency="USD"
-                      subtitle="Servicios mecánicos"
-                    />
-                    <FinancialSummaryCard
-                      title="Rentabilidad Neta"
-                      amount={financialSummary.rentabilidadDolares}
-                      icon={BarChart3}
-                      variant="profit"
-                      currency="USD"
-                      badgeText="Neto"
-                      secondaryAmount={{
-                        label: "En Bolívares",
-                        amount: financialSummary.rentabilidadBolivares,
-                        currency: "BS",
-                      }}
-                      subtitle="Balance de esta unidad"
-                    />
-                    <FinancialSummaryCard
-                      title="Rentabilidad en Bs"
-                      amount={financialSummary.rentabilidadBsDirecta ?? 0}
-                      icon={TrendingUp}
-                      variant="profit"
-                      currency="BS"
-                      badgeText="Bs Neto"
-                      subtitle="Ingresos Bs − Gastos Bs directos"
-                    />
-                    <FinancialSummaryCard
-                      title="Saldos Pendientes"
-                      amount={financialSummary.totalSaldoPendiente ?? 0}
-                      icon={AlertCircle}
-                      variant="debt"
-                      currency="USD"
-                      badgeText="Por Pagar"
-                      subtitle="Solo de abonos en mantenimiento y repuestos"
-                    />
-                    {(financialSummary.totalOtrosIngresosDolares ?? 0) > 0 && (
-                      <FinancialSummaryCard
-                        title="Otros Ingresos $"
-                        amount={financialSummary.totalOtrosIngresosDolares ?? 0}
-                        icon={Wallet}
-                        variant="income"
-                        currency="USD"
-                        badgeText="Extra"
-                        subtitle="Ingresos adicionales en USD"
-                      />
-                    )}
-                    {(financialSummary.totalOtrosIngresosBolivares ?? 0) > 0 && (
-                      <FinancialSummaryCard
-                        title="Otros Ingresos Bs"
-                        amount={financialSummary.totalOtrosIngresosBolivares ?? 0}
-                        icon={Wallet}
-                        variant="income"
-                        currency="BS"
-                        badgeText="Extra"
-                        subtitle="Ingresos adicionales en Bs"
-                      />
-                    )}
-                  </div>
+                  <FinancialMetricsGrid
+                    summary={financialSummary}
+                    isGlobal={false}
+                    unidad={unidad}
+                    movimientos={{
+                      ingresos: ultimosIngresos || [],
+                      registrosMantenimiento: ultimosRegistrosMantenimiento || [],
+                      mantenimientos: dashboardData?.ultimosMantenimientos || [],
+                      otrosIngresos: dashboardData?.otrosIngresos || [],
+                      otrosEgresos: dashboardData?.otrosEgresos || [],
+                    }}
+                  />
                 </section>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
@@ -718,6 +558,14 @@ export default async function DashboardPage({
                           </span>
                         </div>
                       </div>
+                      {(financialSummary.totalOtrosEgresosDolares ?? 0) > 0 && (
+                        <>
+                          <span className="text-slate-500 font-bold">−</span>
+                          <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-rose-300 font-mono font-semibold" title="Otros egresos en dólares">
+                            {formatUSD(financialSummary.totalOtrosEgresosDolares ?? 0)}
+                          </div>
+                        </>
+                      )}
                       <span className="text-slate-500 font-bold">=</span>
                       <div
                         className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
@@ -742,6 +590,14 @@ export default async function DashboardPage({
                           {formatBs(financialSummary.totalGastosRepuestosBs ?? 0)}
                         </span>
                       </div>
+                      {(financialSummary.totalOtrosEgresosBolivares ?? 0) > 0 && (
+                        <>
+                          <span className="text-slate-500 font-bold">−</span>
+                          <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-rose-300 font-mono font-semibold" title="Otros egresos en bolívares">
+                            {formatBs(financialSummary.totalOtrosEgresosBolivares ?? 0)}
+                          </div>
+                        </>
+                      )}
                       <span className="text-slate-500 font-bold">=</span>
                       <div
                         className={`rounded-xl px-3.5 py-1.5 font-mono font-bold text-base ${
@@ -853,6 +709,26 @@ export default async function DashboardPage({
                       Historial de Otros Ingresos
                     </h3>
                     <OtrosIngresosTable registros={otrosIngresos as OtroIngreso[]} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* TAB: OTROS EGRESOS */}
+            {activeTab === "otros-egresos" && (
+              <section>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Registrar Egreso
+                    </h3>
+                    <OtrosEgresosForm />
+                  </div>
+                  <div>
+                    <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Historial de Otros Egresos
+                    </h3>
+                    <OtrosEgresosTable registros={otrosEgresos as OtroEgreso[]} />
                   </div>
                 </div>
               </section>

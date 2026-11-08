@@ -27,6 +27,7 @@ import {
   PiggyBank,
   User,
   Receipt,
+  Gauge,
 } from "lucide-react";
 
 interface IncomeTableProps {
@@ -342,6 +343,19 @@ function DetalleIngresoModal({
               </div>
             </div>
           )}
+
+          {/* Kilometraje Registrado si existe */}
+          {ingreso.kilometraje_actual && (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs">
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <Gauge className="h-3.5 w-3.5 text-violet-400" />
+                Kilometraje de la Unidad:
+              </span>
+              <span className="font-mono font-bold text-white">
+                {Number(ingreso.kilometraje_actual).toLocaleString()} km
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -467,6 +481,12 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
                         </span>
                       )}
                     </div>
+                    {ingreso.kilometraje_actual ? (
+                      <p className="text-[11px] font-mono text-slate-500 flex items-center gap-1 mt-0.5">
+                        <Gauge className="h-3 w-3 text-slate-600" />
+                        {Number(ingreso.kilometraje_actual).toLocaleString()} km
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3">
                     {ingreso.comprobante ? (
@@ -538,7 +558,7 @@ export function IncomeTable({ ingresos, totalBsUsadosCompras = 0 }: IncomeTableP
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {formatDate(ingreso.fecha)}{ingreso.comprobante ? ` · ${ingreso.comprobante}` : ""}
+                  {formatDate(ingreso.fecha)}{ingreso.comprobante ? ` · ${ingreso.comprobante}` : ""}{ingreso.kilometraje_actual ? ` · ${Number(ingreso.kilometraje_actual).toLocaleString()} km` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

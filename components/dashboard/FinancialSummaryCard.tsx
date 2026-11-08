@@ -20,6 +20,7 @@ interface FinancialSummaryCardProps {
     amount: number;
     currency: "USD" | "BS";
   };
+  onClick?: () => void;
 }
 
 const variantConfig = {
@@ -123,16 +124,30 @@ export function FinancialSummaryCard({
   currency = "USD",
   badgeText,
   secondaryAmount,
+  onClick,
 }: FinancialSummaryCardProps) {
   const config = variantConfig[variant];
   const isNegative = amount < 0;
 
   return (
     <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`
         relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5
         backdrop-blur-sm transition-all duration-300
-        hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20
+        ${
+          onClick
+            ? "cursor-pointer hover:scale-[1.03] hover:shadow-xl hover:shadow-black/30 hover:border-white/40 active:scale-[0.99] group"
+            : "hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20"
+        }
         ${config.gradient} ${isNegative ? "border-red-500/40" : config.border}
       `}
     >
@@ -143,7 +158,9 @@ export function FinancialSummaryCard({
       <div className="relative flex items-start justify-between gap-3">
         {/* Ícono */}
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform ${
+            onClick ? "group-hover:scale-110" : ""
+          } ${
             isNegative ? "bg-red-500/20" : config.iconBg
           }`}
         >
@@ -192,6 +209,13 @@ export function FinancialSummaryCard({
 
         {subtitle && (
           <p className="mt-1 text-[11px] text-slate-500 leading-tight">{subtitle}</p>
+        )}
+
+        {onClick && (
+          <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">
+            <span>Ver detalle de movimientos</span>
+            <span className="transition-transform group-hover:translate-x-1 font-bold">→</span>
+          </div>
         )}
       </div>
     </div>

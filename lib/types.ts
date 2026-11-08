@@ -16,7 +16,7 @@ export interface Unidad {
   anio: number;
   kilometraje_actual: number;
   estado: "activo" | "inactivo" | "mantenimiento";
-  tipo_unidad?: "Unidad Comun" | "Fraternidad" | string;
+  tipo_unidad?: "Unidad Comun" | "Fraternidad" | "Otra" | string;
   created_at?: string;
 }
 
@@ -195,6 +195,25 @@ export interface OtroIngreso {
 }
 
 // -------------------------------------------------------
+// Tabla: otros_egresos
+// Registro de egresos adicionales (gastos extra globales)
+// -------------------------------------------------------
+export interface OtroEgreso {
+  id: number;
+  user_id: string;
+  concepto: string;
+  /** Moneda principal del registro: USD o BS */
+  tipo_moneda: "USD" | "BS";
+  /** Monto en dólares (solo cuando tipo_moneda = 'USD') */
+  monto_usd: number;
+  /** Monto en bolívares (solo cuando tipo_moneda = 'BS') */
+  monto_bs: number;
+  fecha: string; // ISO date string
+  notas?: string | null;
+  created_at?: string;
+}
+
+// -------------------------------------------------------
 // Tabla: compras_dolares
 // Registro de compras de divisas (dólares) por unidad
 // -------------------------------------------------------
@@ -270,6 +289,10 @@ export interface FinancialSummary {
   totalOtrosIngresosDolares?: number;
   /** Total de otros ingresos en bolívares */
   totalOtrosIngresosBolivares?: number;
+  /** Total de otros egresos en dólares (se resta de la rentabilidad) */
+  totalOtrosEgresosDolares?: number;
+  /** Total de otros egresos en bolívares (se resta de la rentabilidad en Bs) */
+  totalOtrosEgresosBolivares?: number;
 }
 
 /** Datos completos que carga el dashboard */
@@ -282,6 +305,8 @@ export interface DashboardData {
   ultimosGastosManoObra: GastoManoObra[];
   ultimosIngresos: IngresoUnidad[];
   ultimosRegistrosMantenimiento: RegistroMantenimiento[];
+  otrosIngresos?: OtroIngreso[];
+  otrosEgresos?: OtroEgreso[];
 }
 
 /** Resultado genérico de un Server Action */

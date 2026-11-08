@@ -7,6 +7,7 @@ import {
   Droplets,
   Package,
   TrendingUp,
+  TrendingDown,
   Car,
   Menu,
   X,
@@ -40,7 +41,7 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
     },
     {
       id: "resumen",
-      label: "Resumen Financiero",
+      label: "Resumen de Unidad",
       icon: LayoutDashboard,
       description: "Rentabilidad y métricas",
     },
@@ -61,6 +62,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       label: "Otros Ingresos",
       icon: Wallet,
       description: "Ingresos adicionales",
+    },
+    {
+      id: "otros-egresos",
+      label: "Otros Egresos",
+      icon: TrendingDown,
+      description: "Gastos adicionales",
     },
     {
       id: "repuestos",
