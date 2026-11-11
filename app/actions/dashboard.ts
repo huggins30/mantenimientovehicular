@@ -6,6 +6,7 @@
 // ============================================================
 
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { isUnidadOtra } from "@/lib/types";
 import type {
   DashboardData,
   FinancialSummary,
@@ -163,6 +164,7 @@ export async function getDashboardData(
       supabase
         .from("otros_egresos")
         .select("*")
+        .eq("unidad_id", unidadId)
         .eq("user_id", user.id),
     ]);
 
@@ -413,6 +415,9 @@ export interface ResumenPorUnidad {
   rentabilidadBsDirecta?: number;
   /** Saldo pendiente por pagar ($) */
   totalSaldoPendiente?: number;
+  /** Otros Egresos propios de la unidad */
+  totalOtrosEgresosDolares?: number;
+  totalOtrosEgresosBolivares?: number;
 }
 
 export interface GlobalMovimientos {
@@ -460,10 +465,15 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
 
   const unidades = unidadesRes.data ?? [];
 
-  // IDs de unidades tipo "Otra": sus ingresos/egresos NO se suman al Resumen General
+  // IDs de unidades tipo "Otra" / "Otros": sus ingresos/egresos NO se suman al Resumen General
   const idsOtra = new Set(
-    unidades.filter((u) => (u as any).tipo_unidad === "Otra").map((u) => u.id)
+    unidades.filter((u) => isUnidadOtra((u as any).tipo_unidad)).map((u) => String(u.id))
   );
+
+  function checkIsOtra(uid: any): boolean {
+    if (uid === undefined || uid === null) return false;
+    return idsOtra.has(String(uid));
+  }
 
   const rawIngresos = [
     ...(ingresosRes.data ?? []).map((i) => ({ ...i, tipo_tabla: "comun" as const })),
@@ -473,7 +483,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const rawRegistrosMantenimiento = registrosMantenimientoRes.data ?? [];
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
   const rawOtrosIngresosGlobal = (otrosIngresosGlobalRes?.data ?? []) as { tipo_moneda: string; monto_usd: number; monto_bs: number; fecha: string }[];
-  const rawOtrosEgresosGlobal = (otrosEgresosGlobalRes?.data ?? []) as { tipo_moneda: string; monto_usd: number; monto_bs: number; fecha: string }[];
+  const rawOtrosEgresosGlobal = (otrosEgresosGlobalRes?.data ?? []) as OtroEgreso[];
 
   // Aplicar filtros de fecha si se especificaron
   const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
@@ -483,17 +493,19 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const otrosIngresosGlobal = rawOtrosIngresosGlobal.filter((o) => matchesDateFilter(o.fecha, filter));
   const otrosEgresosGlobal = rawOtrosEgresosGlobal.filter((o) => matchesDateFilter(o.fecha, filter));
 
-  // Para el Resumen General (financialSummary) se excluyen las unidades tipo "Otra"
-  const ingresosGlobal = ingresos.filter((i) => !idsOtra.has(i.unidad_id));
-  const mantenimientosGlobal = mantenimientos.filter((m) => !idsOtra.has(m.unidad_id));
-  const registrosMantenimientoGlobal = registrosMantenimiento.filter((r) => !idsOtra.has(r.unidad_id));
+  // Para el Resumen General (financialSummary) se excluyen todas las unidades tipo "Otra" / "Otros"
+  const ingresosGlobal = ingresos.filter((i) => !checkIsOtra(i.unidad_id));
+  const mantenimientosGlobal = mantenimientos.filter((m) => !checkIsOtra(m.unidad_id));
+  const registrosMantenimientoGlobal = registrosMantenimiento.filter((r) => !checkIsOtra(r.unidad_id));
+  const comprasDolaresGlobal = comprasDolares.filter((c) => !checkIsOtra(c.unidad_id));
+  const otrosEgresosGlobalFiltrado = otrosEgresosGlobal.filter((o) => !checkIsOtra(o.unidad_id));
 
-  // Totales globales
-  const totalDolaresComprados = comprasDolares.reduce(
+  // Totales globales (excluyendo unidades clasificadas como Otra/Otros)
+  const totalDolaresComprados = comprasDolaresGlobal.reduce(
     (sum, c) => sum + (Number(c.cantidad_dolares) || 0),
     0
   );
-  const totalBsUsadosCompras = comprasDolares.reduce(
+  const totalBsUsadosCompras = comprasDolaresGlobal.reduce(
     (sum, c) =>
       sum +
       (Number(c.costo_bolivares) ||
@@ -543,11 +555,11 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     .filter((o) => o.tipo_moneda === "BS")
     .reduce((s, o) => s + (Number(o.monto_bs) || 0), 0);
 
-  // Otros Egresos Globales
-  const totalOtrosEgresosDolares = otrosEgresosGlobal
+  // Otros Egresos Globales (excluyendo unidades tipo "Otra")
+  const totalOtrosEgresosDolares = otrosEgresosGlobalFiltrado
     .filter((o) => o.tipo_moneda === "USD")
     .reduce((s, o) => s + (Number(o.monto_usd) || 0), 0);
-  const totalOtrosEgresosBolivares = otrosEgresosGlobal
+  const totalOtrosEgresosBolivares = otrosEgresosGlobalFiltrado
     .filter((o) => o.tipo_moneda === "BS")
     .reduce((s, o) => s + (Number(o.monto_bs) || 0), 0);
 
@@ -602,11 +614,20 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       return s;
     }, 0);
     const uAceite = mantenimientos.filter((m) => m.unidad_id === uid).reduce((s, m) => s + (m.costo_servicio ?? 0), 0);
-    // Rentabilidad $ por unidad = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$)
-    const uRentabilidadDolares = uIngresosDolares - (uGastos + uManoObra + uAceite);
-    const uRentabilidadBolivares = uIngresosBolivares - uGastosBs;
-    // Rentabilidad en Bs por unidad: Ingresos Bs − Gastos directos en Bs
-    const uRentabilidadBsDirecta = uIngresosBolivares - uGastosBsDirecto;
+
+    // Otros Egresos de la unidad
+    const uOtrosEgresosDolares = otrosEgresosGlobal
+      .filter((o) => o.unidad_id === uid && o.tipo_moneda === "USD")
+      .reduce((s, o) => s + (Number(o.monto_usd) || 0), 0);
+    const uOtrosEgresosBolivares = otrosEgresosGlobal
+      .filter((o) => o.unidad_id === uid && o.tipo_moneda === "BS")
+      .reduce((s, o) => s + (Number(o.monto_bs) || 0), 0);
+
+    // Rentabilidad $ por unidad = Ingresos$ − (Repuestos$ + Mano de Obra$ + Aceite$) - Otros Egresos$
+    const uRentabilidadDolares = uIngresosDolares - (uGastos + uManoObra + uAceite) - uOtrosEgresosDolares;
+    const uRentabilidadBolivares = uIngresosBolivares - uGastosBs - uOtrosEgresosBolivares;
+    // Rentabilidad en Bs por unidad: Ingresos Bs − Gastos directos en Bs - Otros Egresos en Bs
+    const uRentabilidadBsDirecta = uIngresosBolivares - uGastosBsDirecto - uOtrosEgresosBolivares;
 
     // Saldo pendiente por pagar por unidad: SOLO de registros con abono > 0 y costo_total > abono
     const uSaldoPendiente = registrosMantenimiento
@@ -642,11 +663,13 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalGastosBsDirecto: uGastosBsDirecto,
       rentabilidadBsDirecta: uRentabilidadBsDirecta,
       totalSaldoPendiente: uSaldoPendiente,
+      totalOtrosEgresosDolares: uOtrosEgresosDolares,
+      totalOtrosEgresosBolivares: uOtrosEgresosBolivares,
     };
   });
 
   return {
-    unidadesCount: unidades.length,
+    unidadesCount: unidades.filter((u) => !checkIsOtra(u.id)).length,
     financialSummary: {
       totalIngresos,
       totalIngresosDolares,
@@ -676,8 +699,8 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       mantenimientos: mantenimientosGlobal,
       registrosMantenimiento: registrosMantenimientoGlobal,
       otrosIngresos: otrosIngresosGlobal,
-      otrosEgresos: otrosEgresosGlobal,
-      comprasDolares,
+      otrosEgresos: otrosEgresosGlobalFiltrado,
+      comprasDolares: comprasDolaresGlobal,
     },
     unidades: unidades as Unidad[],
   };

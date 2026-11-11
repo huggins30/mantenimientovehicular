@@ -23,6 +23,8 @@ export async function registrarOtroEgresoAction(
     return { success: false, error: "No estás autenticado." };
   }
 
+  const rawUnidadId = formData.get("unidad_id");
+  const unidadId   = rawUnidadId ? Number(rawUnidadId) : null;
   const concepto   = String(formData.get("concepto") ?? "").trim();
   const tipoMoneda = String(formData.get("tipo_moneda") ?? "USD").trim() as "USD" | "BS";
   const montoUsd   = Number(formData.get("monto_usd"))  || 0;
@@ -31,6 +33,9 @@ export async function registrarOtroEgresoAction(
   const notas      = String(formData.get("notas") ?? "").trim() || null;
 
   // Validaciones
+  if (!unidadId || isNaN(unidadId)) {
+    return { success: false, error: "Debes seleccionar una unidad para registrar el egreso." };
+  }
   if (!concepto) {
     return { success: false, error: "El concepto es requerido." };
   }
@@ -48,6 +53,7 @@ export async function registrarOtroEgresoAction(
     .from("otros_egresos")
     .insert({
       user_id:     user.id,
+      unidad_id:   unidadId,
       concepto,
       tipo_moneda: tipoMoneda,
       monto_usd:   tipoMoneda === "USD" ? montoUsd : 0,
@@ -75,6 +81,7 @@ export async function registrarOtroEgresoAction(
 // Obtener todos los otros egresos del usuario
 // -------------------------------------------------------
 export async function getOtrosEgresos(filter?: {
+  unidadId?: number;
   fecha?: string;
   fechaInicio?: string;
   fechaFin?: string;
@@ -90,6 +97,10 @@ export async function getOtrosEgresos(filter?: {
     .eq("user_id", user.id)
     .order("fecha", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (filter?.unidadId) {
+    query = query.eq("unidad_id", filter.unidadId);
+  }
 
   if (filter?.fecha) {
     query = query.eq("fecha", filter.fecha);

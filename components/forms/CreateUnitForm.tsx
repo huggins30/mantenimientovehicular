@@ -147,7 +147,8 @@ export function CreateUnitForm() {
             >
               <option value="Unidad Comun" className="bg-[#16162a] text-white">Unidad Comun</option>
               <option value="Fraternidad" className="bg-[#16162a] text-white">Fraternidad</option>
-              <option value="Otra" className="bg-[#16162a] text-white">Otra</option>
+              <option value="Otra" className="bg-[#16162a] text-white">Otra (No suma al Resumen General)</option>
+              <option value="Otros" className="bg-[#16162a] text-white">Otros (No suma al Resumen General)</option>
             </select>
           </div>
         </div>

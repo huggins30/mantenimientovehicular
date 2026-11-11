@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.otros_egresos (
   id              SERIAL PRIMARY KEY,
   user_id         UUID           NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  unidad_id       INTEGER        NOT NULL REFERENCES public.unidades(id) ON DELETE CASCADE,
   concepto        VARCHAR(300)   NOT NULL,
   tipo_moneda     VARCHAR(5)     NOT NULL DEFAULT 'USD'
                     CHECK (tipo_moneda IN ('USD', 'BS')),
@@ -26,7 +27,10 @@ CREATE POLICY "Usuarios ven solo sus otros_egresos"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Índice para consultas rápidas por usuario y fecha
+-- Índice para consultas rápidas por usuario, unidad y fecha
 CREATE INDEX IF NOT EXISTS idx_otros_egresos_user_fecha
   ON public.otros_egresos (user_id, fecha DESC);
+
+CREATE INDEX IF NOT EXISTS idx_otros_egresos_user_unidad
+  ON public.otros_egresos (user_id, unidad_id);
 

@@ -174,7 +174,7 @@ export default async function DashboardPage({
   try {
     if (activeTab === "general" || activeTab === "dolares" || activeTab === "chofer") {
       globalData = await getGlobalDashboardData(dateFilter);
-    } else if (activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos" && activeTab !== "otros-egresos") {
+    } else if (activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos") {
       dashboardData = await getDashboardData(activeUnidadId, dateFilter);
     }
   } catch (err) {
@@ -199,13 +199,13 @@ export default async function DashboardPage({
     otrosIngresos = await getOtrosIngresos(dateFilter);
   }
 
-  // Otros Egresos
+  // Otros Egresos (filtrados por la unidad activa)
   let otrosEgresos: OtroEgreso[] = [];
   if (activeTab === "otros-egresos" && !error) {
-    otrosEgresos = await getOtrosEgresos(dateFilter);
+    otrosEgresos = await getOtrosEgresos({ ...dateFilter, unidadId: activeUnidadId });
   }
 
-  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos" && activeTab !== "otros-egresos")) {
+  if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos")) {
     return (
       <main className="min-h-screen bg-background text-white">
         {ErrorHeader}
@@ -307,7 +307,7 @@ export default async function DashboardPage({
                   {activeTab === "chofer" && "Rendimiento de Operadores (Chofer)"}
                   {activeTab === "nueva-unidad" && "Registrar Nuevo Vehículo"}
                   {activeTab === "otros-ingresos" && "Otros Ingresos"}
-                  {activeTab === "otros-egresos" && "Otros Egresos"}
+                  {activeTab === "otros-egresos" && `Otros Egresos: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "resumen" && `Resumen: ${unidad?.numero_unidad ? (unidad.numero_unidad.toLowerCase().includes("unidad") ? unidad.numero_unidad : `Unidad ${unidad.numero_unidad}`) : unidad?.placa}`}
                   {activeTab === "aceite" && `Control de Aceite: ${unidad?.numero_unidad || unidad?.placa}`}
                   {activeTab === "repuestos" && `Gestión de Repuestos: ${unidad?.numero_unidad || unidad?.placa}`}
@@ -722,13 +722,13 @@ export default async function DashboardPage({
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                       Registrar Egreso
                     </h3>
-                    <OtrosEgresosForm />
+                    <OtrosEgresosForm unidad={unidad} unidades={unidades} />
                   </div>
                   <div>
                     <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Historial de Otros Egresos
+                      Historial de Otros Egresos ({unidad?.numero_unidad || unidad?.placa})
                     </h3>
-                    <OtrosEgresosTable registros={otrosEgresos as OtroEgreso[]} />
+                    <OtrosEgresosTable registros={otrosEgresos as OtroEgreso[]} unidades={unidades} />
                   </div>
                 </div>
               </section>

@@ -16,8 +16,18 @@ export interface Unidad {
   anio: number;
   kilometraje_actual: number;
   estado: "activo" | "inactivo" | "mantenimiento";
-  tipo_unidad?: "Unidad Comun" | "Fraternidad" | "Otra" | string;
+  tipo_unidad?: "Unidad Comun" | "Fraternidad" | "Otra" | "Otros" | string;
   created_at?: string;
+}
+
+/**
+ * Retorna true si la unidad está clasificada como "Otra" u "Otros".
+ * Estas unidades no se suman ni reflejan en el Resumen General de la flota.
+ */
+export function isUnidadOtra(tipo?: string | null): boolean {
+  if (!tipo) return false;
+  const clean = String(tipo).trim().toLowerCase();
+  return clean === "otra" || clean === "otro" || clean === "otros" || clean === "otras";
 }
 
 // -------------------------------------------------------
@@ -201,6 +211,7 @@ export interface OtroIngreso {
 export interface OtroEgreso {
   id: number;
   user_id: string;
+  unidad_id?: number;
   concepto: string;
   /** Moneda principal del registro: USD o BS */
   tipo_moneda: "USD" | "BS";

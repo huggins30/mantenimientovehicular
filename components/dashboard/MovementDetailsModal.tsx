@@ -517,10 +517,18 @@ export function MovementDetailsModal({
         const moneda = metricType === "otros_egresos_usd" ? "USD" : "BS";
         const list = (movimientos.otrosEgresos ?? []).filter((o) => o.tipo_moneda === moneda);
         return list
-          .filter((o) => matchSearch(o.fecha, o.concepto, o.notas))
+          .filter((o) =>
+            matchSearch(
+              o.fecha,
+              o.concepto,
+              o.notas,
+              isGlobal && o.unidad_id ? getUnitLabel(o.unidad_id) : undefined
+            )
+          )
           .map((o) => ({
             id: o.id,
             fecha: o.fecha,
+            unidadId: o.unidad_id,
             concepto: o.concepto,
             detalle: o.notas || "Gasto adicional registrado",
             montoPrincipal: moneda === "USD" ? formatUSD(o.monto_usd) : formatBs(o.monto_bs),

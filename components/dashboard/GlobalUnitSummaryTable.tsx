@@ -21,6 +21,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import type { ResumenPorUnidad } from "@/app/actions/dashboard";
+import { isUnidadOtra } from "@/lib/types";
 
 interface GlobalUnitSummaryTableProps {
   resumen: ResumenPorUnidad[];
@@ -167,12 +168,12 @@ function ReporteModal({
           </button>
         </div>
 
-        {/* Aviso unidades "Otra" */}
-        {row.tipo_unidad === "Otra" && (
+        {/* Aviso unidades clasificadas como Otra / Otros */}
+        {isUnidadOtra(row.tipo_unidad) && (
           <div className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
             <EyeOff className="h-4 w-4 text-yellow-400 shrink-0" />
             <p className="text-xs text-yellow-300 font-medium">
-              Esta unidad es de tipo <strong>Otra</strong> — sus ingresos y egresos <strong>no se incluyen</strong> en el Resumen General de la flota.
+              Esta unidad está clasificada como <strong>Otra / Otros</strong> — sus ingresos y egresos <strong>no se incluyen</strong> en el Resumen General de la flota.
             </p>
           </div>
         )}
@@ -327,8 +328,9 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
     );
   }
 
-  // Los totales del pie de tabla excluyen las unidades tipo "Otra" (igual que el Resumen General)
-  const resumenSinOtra = resumen.filter((r) => r.tipo_unidad !== "Otra");
+  // Las unidades tipo "Otra" / "Otros" se excluyen completamente de la tabla del Resumen General
+  const resumenSinOtra = resumen.filter((r) => !isUnidadOtra(r.tipo_unidad));
+  const hayUnidadesOtra = resumen.some((r) => isUnidadOtra(r.tipo_unidad));
   const totalDolares = resumenSinOtra.reduce((s, r) => s + (r.totalIngresosDolares ?? 0), 0);
   const totalBolivares = resumenSinOtra.reduce((s, r) => s + (r.totalIngresosBolivares ?? 0), 0);
 
@@ -354,7 +356,7 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {resumen.map((row) => {
+              {resumenSinOtra.map((row) => {
                 const isPositiveUSD = (row.rentabilidadDolares ?? 0) >= 0;
                 return (
                   <tr key={row.unidad_id} className="transition-colors hover:bg-white/5">
@@ -372,12 +374,6 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
                                     : `Unidad ${row.numero_unidad}`)
                                 : row.placa}
                             </p>
-                            {row.tipo_unidad === "Otra" && (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-300" title="No se suma al Resumen General">
-                                <EyeOff className="h-2.5 w-2.5" />
-                                Otra
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs text-slate-500">{row.placa} · {row.marca} {row.modelo}</p>
                         </div>
@@ -461,9 +457,9 @@ export function GlobalUnitSummaryTable({ resumen }: GlobalUnitSummaryTableProps)
               <tr>
                 <td className="px-5 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">
                   Total Flota
-                  {resumen.some((r) => r.tipo_unidad === "Otra") && (
-                    <span className="ml-1.5 inline-flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-1 py-0.5 text-[9px] text-yellow-400 font-semibold" title="Las unidades tipo Otra están excluidas de estos totales">
-                      <EyeOff className="h-2 w-2" />excl. Otra
+                  {hayUnidadesOtra && (
+                    <span className="ml-1.5 inline-flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-1 py-0.5 text-[9px] text-yellow-400 font-semibold" title="Las unidades tipo Otra/Otros están excluidas de estos totales">
+                      <EyeOff className="h-2 w-2" />excl. Otra/Otros
                     </span>
                   )}
                 </td>

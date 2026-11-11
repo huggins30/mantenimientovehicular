@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.unidades (
   anio                INTEGER      NOT NULL CHECK (anio >= 1900),
   kilometraje_actual  INTEGER      NOT NULL DEFAULT 0 CHECK (kilometraje_actual >= 0),
   tipo_unidad         VARCHAR(50)  NOT NULL DEFAULT 'Unidad Comun'
-                        CHECK (tipo_unidad IN ('Unidad Comun', 'Fraternidad')),
+                        CHECK (tipo_unidad IN ('Unidad Comun', 'Fraternidad', 'Otra', 'Otros')),
   estado              VARCHAR(20)  NOT NULL DEFAULT 'activo'
                         CHECK (estado IN ('activo', 'inactivo', 'mantenimiento')),
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),

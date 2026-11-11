@@ -8,8 +8,8 @@
 
 import { useState, useTransition } from "react";
 import { eliminarOtroEgresoAction } from "@/app/actions/otros_egresos";
-import type { OtroEgreso } from "@/lib/types";
-import { DollarSign, Banknote, Trash2, CalendarDays, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import type { OtroEgreso, Unidad } from "@/lib/types";
+import { DollarSign, Banknote, Trash2, CalendarDays, FileText, ChevronDown, ChevronUp, Car } from "lucide-react";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -39,12 +39,24 @@ function formatDate(dateStr: string): string {
 
 interface OtrosEgresosTableProps {
   registros: OtroEgreso[];
+  unidades?: Unidad[];
 }
 
-export function OtrosEgresosTable({ registros }: OtrosEgresosTableProps) {
+export function OtrosEgresosTable({ registros, unidades = [] }: OtrosEgresosTableProps) {
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
+
+  const unidadesMap = new Map<number, Unidad>(unidades.map((u) => [u.id, u]));
+
+  function getUnitLabel(uid?: number) {
+    if (!uid) return null;
+    const u = unidadesMap.get(uid);
+    if (!u) return `Unidad #${uid}`;
+    return u.numero_unidad
+      ? (u.numero_unidad.toLowerCase().includes("unidad") ? u.numero_unidad : `Unidad ${u.numero_unidad}`)
+      : u.placa;
+  }
 
   const visible = showAll ? registros : registros.slice(0, 8);
 
@@ -126,9 +138,17 @@ export function OtrosEgresosTable({ registros }: OtrosEgresosTableProps) {
 
                   {/* Concepto */}
                   <td className="px-4 py-3">
-                    <p className="font-medium text-white truncate max-w-[180px]" title={reg.concepto}>
-                      {reg.concepto}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-white truncate max-w-[180px]" title={reg.concepto}>
+                        {reg.concepto}
+                      </p>
+                      {reg.unidad_id && getUnitLabel(reg.unidad_id) && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">
+                          <Car className="h-2.5 w-2.5 text-slate-500" />
+                          {getUnitLabel(reg.unidad_id)}
+                        </span>
+                      )}
+                    </div>
                     {reg.notas && (
                       <p className="text-[11px] text-slate-500 truncate max-w-[180px]">{reg.notas}</p>
                     )}

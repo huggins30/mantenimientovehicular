@@ -8,12 +8,17 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { registrarOtroEgresoAction } from "@/app/actions/otros_egresos";
-import type { ActionResult, OtroEgreso } from "@/lib/types";
-import { DollarSign, Banknote, CheckCircle2, AlertCircle, Loader2, MinusCircle } from "lucide-react";
+import type { ActionResult, OtroEgreso, Unidad } from "@/lib/types";
+import { DollarSign, Banknote, CheckCircle2, AlertCircle, Loader2, MinusCircle, Car } from "lucide-react";
 
 const initialState: ActionResult<OtroEgreso> = { success: false };
 
-export function OtrosEgresosForm() {
+interface OtrosEgresosFormProps {
+  unidad?: Unidad;
+  unidades?: Unidad[];
+}
+
+export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProps) {
   const [state, formAction, isPending] = useActionState(
     registrarOtroEgresoAction,
     initialState
@@ -43,9 +48,36 @@ export function OtrosEgresosForm() {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">Nuevo Egreso</p>
-          <p className="text-xs text-slate-500">Registra un gasto adicional</p>
+          <p className="text-xs text-slate-500">Registra un gasto adicional por unidad</p>
         </div>
       </div>
+
+      {/* Selector de Unidad */}
+      {unidades.length > 0 ? (
+        <div className="space-y-1.5">
+          <label htmlFor="oe-unidad_id" className="block text-xs font-medium text-slate-400 uppercase tracking-wider">
+            Unidad Asignada <span className="text-red-400">*</span>
+          </label>
+          <div className="relative">
+            <Car className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <select
+              id="oe-unidad_id"
+              name="unidad_id"
+              required
+              defaultValue={unidad?.id ?? unidades[0]?.id}
+              className="w-full rounded-xl border border-white/10 bg-[#0f1117] pl-9 pr-4 py-2.5 text-sm text-white focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/30 transition-all cursor-pointer"
+            >
+              {unidades.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.numero_unidad ? (u.numero_unidad.toLowerCase().includes("unidad") ? u.numero_unidad : `Unidad ${u.numero_unidad}`) : u.placa} — {u.marca} {u.modelo}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : unidad ? (
+        <input type="hidden" name="unidad_id" value={unidad.id} />
+      ) : null}
 
       {/* Feedback de estado */}
       {state.success && (
