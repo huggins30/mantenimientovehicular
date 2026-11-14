@@ -48,11 +48,13 @@ import { OtrosIngresosForm } from "@/components/forms/OtrosIngresosForm";
 import { OtrosIngresosTable } from "@/components/dashboard/OtrosIngresosTable";
 import { OtrosEgresosForm } from "@/components/forms/OtrosEgresosForm";
 import { OtrosEgresosTable } from "@/components/dashboard/OtrosEgresosTable";
+import { FinanciamientoPanel } from "@/components/dashboard/FinanciamientoPanel";
 import { getAllComprasDolares } from "@/app/actions/dolares";
 import { getChoferPerformanceData } from "@/app/actions/chofer";
 import { getOtrosIngresos } from "@/app/actions/otros_ingresos";
 import { getOtrosEgresos } from "@/app/actions/otros_egresos";
-import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite, OtroIngreso, OtroEgreso } from "@/lib/types";
+import { getEgresosFinanciados, getPagosFinanciamiento } from "@/app/actions/financiamiento";
+import type { IngresoUnidad, RegistroMantenimiento, ComprasDolares, ChoferPerformanceGroup, MantenimientoAceite, OtroIngreso, OtroEgreso, PagoFinanciamiento } from "@/lib/types";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -203,6 +205,17 @@ export default async function DashboardPage({
   let otrosEgresos: OtroEgreso[] = [];
   if (activeTab === "otros-egresos" && !error) {
     otrosEgresos = await getOtrosEgresos({ ...dateFilter, unidadId: activeUnidadId });
+  }
+
+  // Financiamiento
+  let financiadosData: { otrosEgresos: OtroEgreso[]; mantenimientos: RegistroMantenimiento[] } = {
+    otrosEgresos: [],
+    mantenimientos: [],
+  };
+  let pagosFinanciamiento: PagoFinanciamiento[] = [];
+  if (activeTab === "financiamiento" && !error) {
+    financiadosData = await getEgresosFinanciados();
+    pagosFinanciamiento = await getPagosFinanciamiento();
   }
 
   if (error || (!dashboardData && !globalData && activeTab !== "nueva-unidad" && activeTab !== "otros-ingresos")) {
@@ -512,6 +525,7 @@ export default async function DashboardPage({
                       mantenimientos: dashboardData?.ultimosMantenimientos || [],
                       otrosIngresos: dashboardData?.otrosIngresos || [],
                       otrosEgresos: dashboardData?.otrosEgresos || [],
+                      pagosFinanciamiento: dashboardData?.pagosFinanciamiento || [],
                     }}
                   />
                 </section>
@@ -874,6 +888,19 @@ export default async function DashboardPage({
                 <ReporteMantenimiento
                   registros={dashboardData.ultimosRegistrosMantenimiento as RegistroMantenimiento[]}
                   cambiosAceite={dashboardData.ultimosMantenimientos as MantenimientoAceite[]}
+                />
+              </section>
+            )}
+
+            {/* TAB: FINANCIAMIENTO */}
+            {activeTab === "financiamiento" && (
+              <section>
+                <FinanciamientoPanel
+                  otrosEgresos={financiadosData.otrosEgresos}
+                  mantenimientos={financiadosData.mantenimientos}
+                  pagos={pagosFinanciamiento}
+                  unidades={unidades}
+                  activeUnidadId={activeUnidadId}
                 />
               </section>
             )}

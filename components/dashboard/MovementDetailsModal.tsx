@@ -27,6 +27,7 @@ import {
   ArrowRightLeft,
   Receipt,
   Wallet,
+  CreditCard,
 } from "lucide-react";
 import type {
   FinancialSummary,
@@ -46,7 +47,8 @@ export type MetricType =
   | "otros_ingresos_usd"
   | "otros_ingresos_bs"
   | "otros_egresos_usd"
-  | "otros_egresos_bs";
+  | "otros_egresos_bs"
+  | "financiamiento";
 
 interface MovementDetailsModalProps {
   isOpen: boolean;
@@ -63,6 +65,7 @@ interface MovementDetailsModalProps {
     otrosIngresos?: any[];
     otrosEgresos?: any[];
     comprasDolares?: any[];
+    pagosFinanciamiento?: any[];
   };
   resumenPorUnidad?: any[];
 }
@@ -277,6 +280,18 @@ export function MovementDetailsModal({
           color: "rose",
           badgeText: "Egreso Bs",
           totalDisplay: formatBs(summary.totalOtrosEgresosBolivares ?? 0),
+        };
+      case "financiamiento":
+        return {
+          title: "Movimientos: Pagos de Financiamiento",
+          subtitle: "Historial de abonos y cancelaciones de financiamientos",
+          icon: CreditCard,
+          color: "blue",
+          badgeText: "Financiamiento",
+          totalDisplay:
+            (summary.totalPagosFinanciamientoUSD ?? 0) > 0 || (summary.totalPagosFinanciamientoBs ?? 0) === 0
+              ? formatUSD(summary.totalPagosFinanciamientoUSD ?? 0)
+              : formatBs(summary.totalPagosFinanciamientoBs ?? 0),
         };
       default:
         return {
@@ -535,6 +550,59 @@ export function MovementDetailsModal({
           }));
       }
 
+      case "financiamiento": {
+        const list = movimientos.pagosFinanciamiento ?? [];
+        const regMap = new Map<number, any>();
+        for (const r of movimientos.registrosMantenimiento ?? []) {
+          regMap.set(r.id, r);
+        }
+        const oeMap = new Map<number, any>();
+        for (const o of movimientos.otrosEgresos ?? []) {
+          oeMap.set(o.id, o);
+        }
+
+        return list
+          .filter((p) => {
+            const reg = p.registro_mantenimiento_id ? regMap.get(p.registro_mantenimiento_id) : null;
+            const oe = p.otro_egreso_id ? oeMap.get(p.otro_egreso_id) : null;
+            const concepto = reg
+              ? (reg.rep_concepto || reg.mo_concepto || "Mantenimiento")
+              : oe
+              ? oe.concepto
+              : "Financiamiento";
+            const unitId = reg?.unidad_id ?? oe?.unidad_id ?? (p as any).unidad_id;
+            return matchSearch(
+              p.fecha,
+              p.notas,
+              concepto,
+              reg?.proveedor,
+              isGlobal && unitId ? getUnitLabel(unitId) : undefined
+            );
+          })
+          .map((p) => {
+            const reg = p.registro_mantenimiento_id ? regMap.get(p.registro_mantenimiento_id) : null;
+            const oe = p.otro_egreso_id ? oeMap.get(p.otro_egreso_id) : null;
+            const concepto = reg
+              ? (reg.rep_concepto || reg.mo_concepto || "Mantenimiento financiado")
+              : oe
+              ? oe.concepto
+              : "Pago de financiamiento";
+            const unitId = reg?.unidad_id ?? oe?.unidad_id ?? (p as any).unidad_id;
+            const isUsd = p.tipo_moneda === "USD";
+
+            return {
+              id: p.id,
+              fecha: p.fecha,
+              unidadId: unitId,
+              concepto: `Abono: ${concepto}`,
+              detalle: p.notas ? p.notas : (reg ? "Abono a piezas / mantenimiento" : "Abono a otros egresos"),
+              montoPrincipal: isUsd ? formatUSD(Number(p.monto_usd) || 0) : formatBs(Number(p.monto_bs) || 0),
+              montoSecundario: !isUsd && (Number(p.monto_usd) || 0) > 0 ? formatUSD(Number(p.monto_usd) || 0) : undefined,
+              tag: reg ? "Repuestos" : "Otro Egreso",
+            };
+          });
+      }
+
       default:
         return [];
     }
@@ -553,6 +621,7 @@ export function MovementDetailsModal({
     orange: { bg: "bg-orange-500/20", text: "text-orange-400", ring: "ring-orange-500/30" },
     violet: { bg: "bg-violet-500/20", text: "text-violet-400", ring: "ring-violet-500/30" },
     rose: { bg: "bg-rose-500/20", text: "text-rose-400", ring: "ring-rose-500/30" },
+    blue: { bg: "bg-blue-500/20", text: "text-blue-400", ring: "ring-blue-500/30" },
   };
 
   const style = colorStyles[meta.color] || colorStyles.violet;

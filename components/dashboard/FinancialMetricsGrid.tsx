@@ -20,6 +20,7 @@ import {
   TrendingDown,
   AlertCircle,
   Wallet,
+  CreditCard,
 } from "lucide-react";
 import { FinancialSummaryCard } from "./FinancialSummaryCard";
 import { MovementDetailsModal, type MetricType } from "./MovementDetailsModal";
@@ -37,6 +38,7 @@ interface FinancialMetricsGridProps {
     otrosIngresos?: any[];
     otrosEgresos?: any[];
     comprasDolares?: any[];
+    pagosFinanciamiento?: any[];
   };
   resumenPorUnidad?: any[];
 }
@@ -245,6 +247,35 @@ export function FinancialMetricsGrid({
             onClick={() => setActiveMetric("otros_egresos_bs")}
           />
         )}
+
+        {/* 14. Financiamiento */}
+        <FinancialSummaryCard
+          title="Financiamiento"
+          amount={summary.totalPagosFinanciamientoUSD ?? 0}
+          icon={CreditCard}
+          variant="credit"
+          currency="USD"
+          badgeText={
+            (summary.totalRegistrosFinanciados ?? 0) > 0
+              ? `${summary.totalRegistrosFinanciados} financiado${(summary.totalRegistrosFinanciados ?? 0) > 1 ? "s" : ""}`
+              : "Financiado"
+          }
+          secondaryAmount={
+            (summary.totalPagosFinanciamientoBs ?? 0) > 0
+              ? {
+                  label: "En Bolívares",
+                  amount: summary.totalPagosFinanciamientoBs ?? 0,
+                  currency: "BS",
+                }
+              : undefined
+          }
+          subtitle={
+            (summary.totalRegistrosFinanciados ?? 0) > 0
+              ? `${summary.totalRegistrosFinanciados} registro(s) activo(s) en financiamiento`
+              : "Pagos y abonos en financiamiento"
+          }
+          onClick={() => setActiveMetric("financiamiento")}
+        />
       </div>
     </>
   );

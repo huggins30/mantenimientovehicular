@@ -9,7 +9,7 @@
 import { useState, useTransition } from "react";
 import { eliminarOtroEgresoAction } from "@/app/actions/otros_egresos";
 import type { OtroEgreso, Unidad } from "@/lib/types";
-import { DollarSign, Banknote, Trash2, CalendarDays, FileText, ChevronDown, ChevronUp, Car } from "lucide-react";
+import { DollarSign, Banknote, Trash2, CalendarDays, FileText, ChevronDown, ChevronUp, Car, CreditCard } from "lucide-react";
 
 function formatUSD(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -174,15 +174,32 @@ export function OtrosEgresosTable({ registros, unidades = [] }: OtrosEgresosTabl
 
                   {/* Monto */}
                   <td className="px-4 py-3 text-right">
-                    <span
-                      className={`font-mono font-semibold ${
-                        reg.tipo_moneda === "USD" ? "text-rose-300" : "text-orange-300"
-                      }`}
-                    >
-                      {reg.tipo_moneda === "USD"
-                        ? formatUSD(reg.monto_usd)
-                        : formatBs(reg.monto_bs)}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      {reg.financiado && (Number(reg.monto_usd) || 0) === 0 && (Number(reg.monto_bs) || 0) === 0 ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-300 shadow-sm" title="Financiamiento activo (Sin abonos aún)">
+                          <CreditCard className="h-3.5 w-3.5" />
+                          Financiado
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            className={`font-mono font-semibold ${
+                              reg.tipo_moneda === "USD" ? "text-rose-300" : "text-orange-300"
+                            }`}
+                          >
+                            {reg.tipo_moneda === "USD"
+                              ? formatUSD(reg.monto_usd)
+                              : formatBs(reg.monto_bs)}
+                          </span>
+                          {reg.financiado && (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">
+                              <CreditCard className="h-2.5 w-2.5" />
+                              Financiado
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
 
                   {/* Eliminar */}

@@ -7,6 +7,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { isUnidadOtra } from "@/lib/types";
+import { sincronizarPagosConRegistros } from "@/app/actions/financiamiento";
 import type {
   DashboardData,
   FinancialSummary,
@@ -20,6 +21,7 @@ import type {
   ComprasDolares,
   OtroIngreso,
   OtroEgreso,
+  PagoFinanciamiento,
 } from "@/lib/types";
 
 // -------------------------------------------------------
@@ -95,6 +97,9 @@ export async function getDashboardData(
     throw new Error("No estás autenticado. Por favor inicia sesión.");
   }
 
+  // Sincronizar pagos de financiamiento antes de calcular métricas
+  await sincronizarPagosConRegistros(user.id);
+
   // Consultas paralelas para máximo rendimiento
   // El RLS de Supabase garantiza que solo se retornan datos del usuario
   const [
@@ -106,6 +111,7 @@ export async function getDashboardData(
     comprasDolaresRes,
     otrosIngresosRes,
     otrosEgresosRes,
+    pagosFinanciamientoRes,
   ] =
     await Promise.all([
       supabase
@@ -166,6 +172,11 @@ export async function getDashboardData(
         .select("*")
         .eq("unidad_id", unidadId)
         .eq("user_id", user.id),
+
+      supabase
+        .from("pagos_financiamiento")
+        .select("*")
+        .eq("user_id", user.id),
     ]);
 
   // Manejar errores de unidad (crítico)
@@ -212,7 +223,7 @@ export async function getDashboardData(
   const totalDolaresComprados = 0;
   const totalBsUsadosCompras = 0;
 
-  // Gastos en Bs directos (NO convertidos a USD)
+  // Gastos en Bs directos (NO convertidos a USD) — incluye montos abonados de financiados
   const totalGastosBsDirecto = registrosMantenimiento.reduce((sum, r) =>
     sum + (Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0), 0
   );
@@ -285,6 +296,27 @@ export async function getDashboardData(
     return sum + (pendiente > 0 ? pendiente : 0);
   }, 0);
 
+  // Pagos de financiamiento correspondientes a esta unidad
+  const unidadManIds = new Set(rawRegistrosMantenimiento.map((r) => r.id));
+  const unidadOeIds = new Set(rawOtrosEgresos.map((o) => o.id));
+
+  const rawPagosFinanciamiento = (pagosFinanciamientoRes?.data ?? []) as PagoFinanciamiento[];
+  const uPagosFinanciamiento = rawPagosFinanciamiento.filter((p) => {
+    if (p.registro_mantenimiento_id && unidadManIds.has(p.registro_mantenimiento_id)) return true;
+    if (p.otro_egreso_id && unidadOeIds.has(p.otro_egreso_id)) return true;
+    return false;
+  });
+
+  const totalPagosFinanciamientoUSD = uPagosFinanciamiento
+    .filter((p) => p.tipo_moneda === "USD" && matchesDateFilter(p.fecha, filter))
+    .reduce((s, p) => s + (Number(p.monto_usd) || 0), 0);
+  const totalPagosFinanciamientoBs = uPagosFinanciamiento
+    .filter((p) => p.tipo_moneda === "BS" && matchesDateFilter(p.fecha, filter))
+    .reduce((s, p) => s + (Number(p.monto_bs) || 0), 0);
+  const totalRegistrosFinanciados =
+    registrosMantenimiento.filter((r) => r.financiado).length +
+    otrosEgresos.filter((o) => o.financiado).length;
+
   const financialSummary: FinancialSummary = {
     totalIngresos,
     totalIngresosDolares,
@@ -306,6 +338,9 @@ export async function getDashboardData(
     totalOtrosIngresosBolivares,
     totalOtrosEgresosDolares,
     totalOtrosEgresosBolivares,
+    totalPagosFinanciamientoUSD,
+    totalPagosFinanciamientoBs,
+    totalRegistrosFinanciados,
   };
 
   // ---- Estado del semáforo de aceite ----
@@ -340,6 +375,7 @@ export async function getDashboardData(
     ultimosRegistrosMantenimiento: registrosMantenimiento,
     otrosIngresos,
     otrosEgresos,
+    pagosFinanciamiento: uPagosFinanciamiento,
   };
 }
 
@@ -427,6 +463,7 @@ export interface GlobalMovimientos {
   otrosIngresos: any[];
   otrosEgresos: any[];
   comprasDolares: any[];
+  pagosFinanciamiento?: any[];
 }
 
 export async function getGlobalDashboardData(filter?: DashboardDateFilter): Promise<{
@@ -443,6 +480,9 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     throw new Error("No estás autenticado. Por favor inicia sesión.");
   }
 
+  // Sincronizar pagos de financiamiento antes de calcular métricas globales
+  await sincronizarPagosConRegistros(user.id);
+
   const [
     unidadesRes,
     ingresosRes,
@@ -452,6 +492,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     comprasDolaresRes,
     otrosIngresosGlobalRes,
     otrosEgresosGlobalRes,
+    pagosFinanciamientoRes,
   ] = await Promise.all([
     supabase.from("unidades").select("*").eq("user_id", user.id),
     supabase.from("ingresos_unidad").select("*").eq("user_id", user.id),
@@ -461,6 +502,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
     supabase.from("compras_dolares").select("*").eq("user_id", user.id),
     supabase.from("otros_ingresos").select("*").eq("user_id", user.id),
     supabase.from("otros_egresos").select("*").eq("user_id", user.id),
+    supabase.from("pagos_financiamiento").select("*").eq("user_id", user.id),
   ]);
 
   const unidades = unidadesRes.data ?? [];
@@ -484,6 +526,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const rawComprasDolares = (comprasDolaresRes?.data ?? []) as ComprasDolares[];
   const rawOtrosIngresosGlobal = (otrosIngresosGlobalRes?.data ?? []) as { tipo_moneda: string; monto_usd: number; monto_bs: number; fecha: string }[];
   const rawOtrosEgresosGlobal = (otrosEgresosGlobalRes?.data ?? []) as OtroEgreso[];
+  const rawPagosFinanciamiento = (pagosFinanciamientoRes?.data ?? []) as PagoFinanciamiento[];
 
   // Aplicar filtros de fecha si se especificaron
   const ingresos = rawIngresos.filter((i) => matchesDateFilter(i.fecha, filter));
@@ -492,6 +535,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const comprasDolares = rawComprasDolares.filter((c) => matchesDateFilter(c.fecha, filter));
   const otrosIngresosGlobal = rawOtrosIngresosGlobal.filter((o) => matchesDateFilter(o.fecha, filter));
   const otrosEgresosGlobal = rawOtrosEgresosGlobal.filter((o) => matchesDateFilter(o.fecha, filter));
+  const pagosFinanciamientoGlobal = rawPagosFinanciamiento.filter((p) => matchesDateFilter(p.fecha, filter));
 
   // Para el Resumen General (financialSummary) se excluyen todas las unidades tipo "Otra" / "Otros"
   const ingresosGlobal = ingresos.filter((i) => !checkIsOtra(i.unidad_id));
@@ -499,6 +543,31 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
   const registrosMantenimientoGlobal = registrosMantenimiento.filter((r) => !checkIsOtra(r.unidad_id));
   const comprasDolaresGlobal = comprasDolares.filter((c) => !checkIsOtra(c.unidad_id));
   const otrosEgresosGlobalFiltrado = otrosEgresosGlobal.filter((o) => !checkIsOtra(o.unidad_id));
+
+  const regManMap = new Map<number, boolean>();
+  for (const r of rawRegistrosMantenimiento) {
+    regManMap.set(r.id, checkIsOtra(r.unidad_id));
+  }
+  const oeMap = new Map<number, boolean>();
+  for (const o of rawOtrosEgresosGlobal) {
+    oeMap.set(o.id, checkIsOtra(o.unidad_id));
+  }
+
+  const pagosGlobal = pagosFinanciamientoGlobal.filter((p) => {
+    if (p.registro_mantenimiento_id) return !regManMap.get(p.registro_mantenimiento_id);
+    if (p.otro_egreso_id) return !oeMap.get(p.otro_egreso_id);
+    return true;
+  });
+
+  const totalPagosFinanciamientoUSD = pagosGlobal
+    .filter((p) => p.tipo_moneda === "USD")
+    .reduce((s, p) => s + (Number(p.monto_usd) || 0), 0);
+  const totalPagosFinanciamientoBs = pagosGlobal
+    .filter((p) => p.tipo_moneda === "BS")
+    .reduce((s, p) => s + (Number(p.monto_bs) || 0), 0);
+  const totalRegistrosFinanciados =
+    registrosMantenimientoGlobal.filter((r) => r.financiado).length +
+    otrosEgresosGlobalFiltrado.filter((o) => o.financiado).length;
 
   // Totales globales (excluyendo unidades clasificadas como Otra/Otros)
   const totalDolaresComprados = comprasDolaresGlobal.reduce(
@@ -692,6 +761,9 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       totalOtrosIngresosBolivares,
       totalOtrosEgresosDolares,
       totalOtrosEgresosBolivares,
+      totalPagosFinanciamientoUSD,
+      totalPagosFinanciamientoBs,
+      totalRegistrosFinanciados,
     },
     resumenPorUnidad,
     movimientos: {
@@ -701,6 +773,7 @@ export async function getGlobalDashboardData(filter?: DashboardDateFilter): Prom
       otrosIngresos: otrosIngresosGlobal,
       otrosEgresos: otrosEgresosGlobalFiltrado,
       comprasDolares: comprasDolaresGlobal,
+      pagosFinanciamiento: pagosGlobal,
     },
     unidades: unidades as Unidad[],
   };

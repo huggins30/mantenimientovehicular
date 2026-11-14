@@ -31,6 +31,7 @@ export async function registrarOtroEgresoAction(
   const montoBs    = Number(formData.get("monto_bs"))   || 0;
   const fecha      = String(formData.get("fecha") ?? "").trim();
   const notas      = String(formData.get("notas") ?? "").trim() || null;
+  const financiado = formData.get("financiado") === "true";
 
   // Validaciones
   if (!unidadId || isNaN(unidadId)) {
@@ -42,11 +43,14 @@ export async function registrarOtroEgresoAction(
   if (!fecha) {
     return { success: false, error: "La fecha es requerida." };
   }
-  if (tipoMoneda === "USD" && montoUsd <= 0) {
-    return { success: false, error: "El monto en dólares debe ser mayor a cero." };
-  }
-  if (tipoMoneda === "BS" && montoBs <= 0) {
-    return { success: false, error: "El monto en bolívares debe ser mayor a cero." };
+  // Solo validar monto si NO está financiado
+  if (!financiado) {
+    if (tipoMoneda === "USD" && montoUsd <= 0) {
+      return { success: false, error: "El monto en dólares debe ser mayor a cero." };
+    }
+    if (tipoMoneda === "BS" && montoBs <= 0) {
+      return { success: false, error: "El monto en bolívares debe ser mayor a cero." };
+    }
   }
 
   const { data, error } = await supabase
@@ -56,10 +60,11 @@ export async function registrarOtroEgresoAction(
       unidad_id:   unidadId,
       concepto,
       tipo_moneda: tipoMoneda,
-      monto_usd:   tipoMoneda === "USD" ? montoUsd : 0,
-      monto_bs:    tipoMoneda === "BS"  ? montoBs  : 0,
+      monto_usd:   financiado ? 0 : (tipoMoneda === "USD" ? montoUsd : 0),
+      monto_bs:    financiado ? 0 : (tipoMoneda === "BS"  ? montoBs  : 0),
       fecha,
       notas,
+      financiado,
     })
     .select()
     .single();

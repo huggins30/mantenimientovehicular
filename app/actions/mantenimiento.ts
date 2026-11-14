@@ -48,11 +48,20 @@ export async function registrarMantenimientoAction(
   // ── Abono (adelanto pagado, en USD) ─────────────────────────────────────
   const abono = Math.max(0, Number(formData.get("abono") || 0));
 
+  // ── Financiado ───────────────────────────────────────────────────────────
+  const financiado = formData.get("financiado") === "true";
+
   // ── Validaciones Generales ──────────────────────────────
   if (!fecha)
     return { success: false, error: "La fecha es requerida." };
-  if (!moConcepto)
-    return { success: false, error: "El concepto de mano de obra es requerido." };
+  let finalMoConcepto = moConcepto;
+  if (!finalMoConcepto) {
+    if (financiado) {
+      finalMoConcepto = "Instalación / Mantenimiento";
+    } else {
+      return { success: false, error: "El concepto de mano de obra es requerido." };
+    }
+  }
   if (isNaN(moCostoUSD) || moCostoUSD < 0)
     return { success: false, error: "El costo de mano de obra en dólares no puede ser negativo." };
   if (isNaN(moCostoBs) || moCostoBs < 0)
@@ -139,7 +148,7 @@ export async function registrarMantenimientoAction(
   // Mano de Obra en USD: solo el monto USD directo
   const moUSD = moCostoUSD;
 
-  if (repSubtotalUSD <= 0 && moUSD <= 0 && precioBsRepuestos <= 0 && precioBsManoObra <= 0) {
+  if (!financiado && repSubtotalUSD <= 0 && moUSD <= 0 && precioBsRepuestos <= 0 && precioBsManoObra <= 0) {
     return { success: false, error: "Debe ingresar un monto en dólares o bolívares para las piezas o la mano de obra." };
   }
 
@@ -158,7 +167,7 @@ export async function registrarMantenimientoAction(
       rep_concepto:      repConcepto,
       rep_cantidad:      repCantidad,
       rep_costo_unitario: Number(repUnitUSD.toFixed(2)),
-      mo_concepto:       moConcepto,
+      mo_concepto:       finalMoConcepto,
       mo_costo:          Number(moUSD.toFixed(2)),
       tasa_cambio:       tasaCambio ?? null,
       costo_bolivares:   costoBolivares,
@@ -167,6 +176,7 @@ export async function registrarMantenimientoAction(
       precio_bs_repuestos: precioBsRepuestos > 0 ? Number(precioBsRepuestos.toFixed(2)) : 0,
       precio_bs_mano_obra: precioBsManoObra > 0 ? Number(precioBsManoObra.toFixed(2)) : 0,
       abono:               abono > 0 ? Number(abono.toFixed(2)) : 0,
+      financiado,
     })
     .select()
     .single();

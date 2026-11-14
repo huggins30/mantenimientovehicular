@@ -25,6 +25,7 @@ import {
   Banknote,
   Plus,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 
 interface MantenimientoFormProps {
@@ -77,6 +78,9 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
   // Abono (adelanto recibido, en USD)
   const [abono, setAbono] = useState<string>("");
 
+  // Financiado: oculta montos temporalmente
+  const [financiado, setFinanciado] = useState(false);
+
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
@@ -86,6 +90,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
       setCostoManoUSD("");
       setPrecioBsMano("");
       setAbono("");
+      setFinanciado(false);
       const t = setTimeout(() => setShowSuccess(false), 4000);
       return () => clearTimeout(t);
     }
@@ -198,8 +203,32 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
         <input type="hidden" name="precio_bs_repuestos" value={totalBsDirectoRepuestos} />
         <input type="hidden" name="precio_bs_mano_obra" value={precioBsMano} />
         <input type="hidden" name="abono" value={abono} />
+        <input type="hidden" name="financiado" value={financiado ? "true" : "false"} />
         {/* tasa_cambio ya no se usa en los cálculos pero lo enviamos vacío para compatibilidad */}
         <input type="hidden" name="tasa_cambio" value="" />
+
+        {/* ── Toggle Financiado ── */}
+        <div
+          onClick={() => setFinanciado(!financiado)}
+          className={`flex items-center gap-3 cursor-pointer rounded-xl border px-4 py-3 transition-all duration-200 select-none ${
+            financiado
+              ? "border-blue-500/40 bg-blue-500/10"
+              : "border-white/10 bg-white/5 hover:bg-white/8"
+          }`}
+        >
+          <div className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+            financiado ? "border-blue-400 bg-blue-500" : "border-slate-600 bg-transparent"
+          }`}>
+            {financiado && <span className="text-white text-xs font-bold">✓</span>}
+          </div>
+          <CreditCard className={`h-4 w-4 ${financiado ? "text-blue-400" : "text-slate-500"}`} />
+          <div>
+            <p className={`text-sm font-semibold ${financiado ? "text-blue-300" : "text-slate-300"}`}>
+              Financiado
+            </p>
+            <p className="text-xs text-slate-500">Los montos se ocultan y aparecen en la sección de Financiamiento</p>
+          </div>
+        </div>
 
         {/* ── Fecha + Proveedor ── */}
         <div className="grid grid-cols-2 gap-3">
@@ -248,9 +277,14 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 {piezas.length} {piezas.length === 1 ? "pieza" : "piezas"}
               </span>
             </div>
-            {subtotalRepUSD > 0 && (
+            {subtotalRepUSD > 0 && !financiado && (
               <span className="font-mono text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-md px-2 py-0.5">
                 Subtotal: {formatUSD(subtotalRepUSD)}
+              </span>
+            )}
+            {financiado && (
+              <span className="font-mono text-xs font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 rounded-md px-2 py-0.5">
+                Financiado
               </span>
             )}
           </div>
@@ -380,7 +414,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 </div>
 
                 {/* Tres campos: Costo USD | Monto Bs (read-only, calculado) | Precio Bs Directo */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2.5 transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
                   {/* Costo Unitario USD */}
                   <div className="space-y-1">
                     <label className="block text-[11px] font-medium text-slate-400">
@@ -392,8 +426,8 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                         type="number"
                         min="0"
                         step="0.01"
-                        placeholder="0.00"
-                        value={p.costoUSD}
+                        placeholder={financiado ? "Financiado" : "0.00"}
+                        value={financiado ? "" : p.costoUSD}
                         onChange={(e) => actualizarPieza(p.id, "costoUSD", e.target.value)}
                         className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40"
                       />
@@ -406,7 +440,13 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                       Subtotal ($)
                     </label>
                     <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-slate-300 h-[38px]">
-                      {p.itemSubUSD > 0 ? formatUSD(p.itemSubUSD) : <span className="text-slate-600">—</span>}
+                      {financiado ? (
+                        <span className="text-blue-300 font-semibold text-xs">Financiado</span>
+                      ) : p.itemSubUSD > 0 ? (
+                        formatUSD(p.itemSubUSD)
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
                     </div>
                   </div>
 
@@ -421,8 +461,8 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                         type="number"
                         min="0"
                         step="0.01"
-                        placeholder="0.00"
-                        value={p.precioBsDirecto}
+                        placeholder={financiado ? "Financiado" : "0.00"}
+                        value={financiado ? "" : p.precioBsDirecto}
                         onChange={(e) => actualizarPieza(p.id, "precioBsDirecto", e.target.value)}
                         className="w-full rounded-xl border border-purple-500/30 bg-purple-500/10 pl-9 pr-3 py-2 text-sm font-mono text-purple-200 placeholder-slate-500 outline-none transition-all hover:border-purple-500/50 focus:border-purple-400 focus:ring-1 focus:ring-purple-500/40"
                       />
@@ -459,14 +499,14 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 <Calculator className="h-3.5 w-3.5" />
                 Subtotal Piezas ({totalPiezasCount} {totalPiezasCount === 1 ? "unidad" : "unidades"} en {piezas.length} {piezas.length === 1 ? "ítem" : "ítems"})
               </span>
-              <span className="font-mono text-sm sm:text-base font-bold text-amber-300">
-                {formatUSD(subtotalRepUSD)}
+              <span className={`font-mono text-sm sm:text-base font-bold ${financiado ? "text-blue-300" : "text-amber-300"}`}>
+                {financiado ? "Financiado" : formatUSD(subtotalRepUSD)}
               </span>
             </div>
           </div>
 
           {/* Total Bs Directo de todas las piezas (si hay) */}
-          {totalBsDirectoRepuestos > 0 && (
+          {!financiado && totalBsDirectoRepuestos > 0 && (
             <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-2.5">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
@@ -491,17 +531,21 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 Mano de Obra
               </span>
             </div>
-            {subtotalManoUSD > 0 && (
+            {financiado ? (
+              <span className="font-mono text-xs font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 rounded-md px-2 py-0.5">
+                Financiado
+              </span>
+            ) : subtotalManoUSD > 0 ? (
               <span className="font-mono text-xs font-bold text-orange-300 bg-orange-500/15 border border-orange-500/30 rounded-md px-2 py-0.5">
                 Subtotal: {formatUSD(subtotalManoUSD)}
               </span>
-            )}
+            ) : null}
           </div>
 
           {/* Concepto */}
           <div className="space-y-1.5">
             <label htmlFor="mo_concepto" className="block text-xs font-medium text-slate-400">
-              Descripción del servicio <span className="text-red-400">*</span>
+              Descripción del servicio {!financiado && <span className="text-red-400">*</span>}
             </label>
             <div className="relative">
               <Hammer className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
@@ -509,15 +553,15 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 id="mo_concepto"
                 name="mo_concepto"
                 type="text"
-                placeholder="Ej: Cambio de pastillas de freno"
-                required
+                placeholder={financiado ? "Opcional (Ej: Instalación, Reparación...)" : "Ej: Cambio de pastillas de freno"}
+                required={!financiado}
                 className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
               />
             </div>
           </div>
 
           {/* Costo USD | Subtotal (read-only) | Precio Bs Directo */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2.5 transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
             {/* Costo Mano de Obra USD */}
             <div className="space-y-1.5">
               <label htmlFor="mo_costo" className="block text-xs font-medium text-slate-400">
@@ -531,8 +575,8 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
-                  value={costoManoUSD}
+                  placeholder={financiado ? "Financiado" : "0.00"}
+                  value={financiado ? "" : costoManoUSD}
                   onChange={(e) => setCostoManoUSD(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all hover:border-white/20 focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40"
                 />
@@ -545,7 +589,13 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                 Subtotal ($)
               </label>
               <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-mono text-slate-300 h-[42px]">
-                {subtotalManoUSD > 0 ? formatUSD(subtotalManoUSD) : <span className="text-slate-600">—</span>}
+                {financiado ? (
+                  <span className="text-blue-300 font-semibold text-xs">Financiado</span>
+                ) : subtotalManoUSD > 0 ? (
+                  formatUSD(subtotalManoUSD)
+                ) : (
+                  <span className="text-slate-600">—</span>
+                )}
               </div>
             </div>
 
@@ -561,8 +611,8 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
-                  value={precioBsMano}
+                  placeholder={financiado ? "Financiado" : "0.00"}
+                  value={financiado ? "" : precioBsMano}
                   onChange={(e) => setPrecioBsMano(e.target.value)}
                   className="w-full rounded-xl border border-purple-500/30 bg-purple-500/10 pl-9 pr-3 py-2.5 text-sm font-mono text-purple-200 placeholder-slate-500 outline-none transition-all hover:border-purple-500/50 focus:border-purple-400 focus:ring-1 focus:ring-purple-500/40"
                 />
@@ -571,7 +621,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
           </div>
 
           {/* Total Bs Directo Mano de Obra (si hay) */}
-          {(parseFloat(precioBsMano) || 0) > 0 && (
+          {!financiado && (parseFloat(precioBsMano) || 0) > 0 && (
             <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-2.5">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
@@ -588,7 +638,7 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
         </div>
 
         {/* ── Abono (Adelanto recibido) ── */}
-        <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+        <div className={`rounded-xl border border-green-500/30 bg-green-500/5 p-4 space-y-3 transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/20">
               <DollarSign className="h-3.5 w-3.5 text-green-400" strokeWidth={1.5} />
@@ -647,13 +697,19 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
               </span>
             </div>
             <span className="font-mono text-lg font-bold text-violet-200">
-              {formatUSD(totalGeneralUSD)}
+              {financiado ? (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/20 px-2.5 py-1 text-xs font-bold text-blue-300">
+                  <CreditCard className="h-3.5 w-3.5" /> Financiado
+                </span>
+              ) : (
+                formatUSD(totalGeneralUSD)
+              )}
             </span>
           </div>
 
           <div className="border-t border-violet-500/20 pt-2 space-y-1.5">
             {/* ── Resumen Bs Directo ── */}
-            {(totalBsDirectoRepuestos > 0 || (parseFloat(precioBsMano) || 0) > 0) && (
+            {!financiado && (totalBsDirectoRepuestos > 0 || (parseFloat(precioBsMano) || 0) > 0) && (
               <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/10 px-3 py-1.5">
                 <span className="text-xs font-semibold text-purple-300 flex items-center gap-1">
                   <Banknote className="h-3.5 w-3.5 text-purple-400" />
@@ -667,7 +723,13 @@ export function MantenimientoForm({ unidad }: MantenimientoFormProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-400 gap-1">
               <span>Incluye Piezas y Mano de Obra:</span>
               <span className="font-mono text-slate-300">
-                Piezas: <strong className="text-amber-300">{formatUSD(subtotalRepUSD)}</strong> + Mano de Obra: <strong className="text-orange-300">{formatUSD(subtotalManoUSD)}</strong>
+                {financiado ? (
+                  <span className="text-blue-300 font-semibold">Montos ocultos temporalmente</span>
+                ) : (
+                  <>
+                    Piezas: <strong className="text-amber-300">{formatUSD(subtotalRepUSD)}</strong> + Mano de Obra: <strong className="text-orange-300">{formatUSD(subtotalManoUSD)}</strong>
+                  </>
+                )}
               </span>
             </div>
           </div>

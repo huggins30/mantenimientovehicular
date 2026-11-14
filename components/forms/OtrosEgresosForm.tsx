@@ -6,10 +6,10 @@
 // Formulario para registrar egresos adicionales (gastos extra)
 // ============================================================
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { registrarOtroEgresoAction } from "@/app/actions/otros_egresos";
 import type { ActionResult, OtroEgreso, Unidad } from "@/lib/types";
-import { DollarSign, Banknote, CheckCircle2, AlertCircle, Loader2, MinusCircle, Car } from "lucide-react";
+import { DollarSign, Banknote, CheckCircle2, AlertCircle, Loader2, MinusCircle, Car, CreditCard } from "lucide-react";
 
 const initialState: ActionResult<OtroEgreso> = { success: false };
 
@@ -24,10 +24,12 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
     initialState
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const [financiado, setFinanciado] = useState(false);
 
   useEffect(() => {
     if (state.success) {
       formRef.current?.reset();
+      setFinanciado(false);
       // Restore default date
       const dateInput = formRef.current?.querySelector<HTMLInputElement>('input[name="fecha"]');
       if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
@@ -108,8 +110,32 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
         />
       </div>
 
+      {/* Toggle Financiado */}
+      <div
+        onClick={() => setFinanciado(!financiado)}
+        className={`flex items-center gap-3 cursor-pointer rounded-xl border px-4 py-3 transition-all duration-200 select-none ${
+          financiado
+            ? "border-blue-500/40 bg-blue-500/10"
+            : "border-white/10 bg-white/5 hover:bg-white/8"
+        }`}
+      >
+        <input type="hidden" name="financiado" value={financiado ? "true" : "false"} />
+        <div className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+          financiado ? "border-blue-400 bg-blue-500" : "border-slate-600 bg-transparent"
+        }`}>
+          {financiado && <span className="text-white text-xs font-bold">✓</span>}
+        </div>
+        <CreditCard className={`h-4 w-4 ${financiado ? "text-blue-400" : "text-slate-500"}`} />
+        <div>
+          <p className={`text-sm font-semibold ${financiado ? "text-blue-300" : "text-slate-300"}`}>
+            Financiado
+          </p>
+          <p className="text-xs text-slate-500">El monto se oculta y aparece en la sección de Financiamiento</p>
+        </div>
+      </div>
+
       {/* Tipo de Moneda */}
-      <div className="space-y-1.5">
+      <div className={`space-y-1.5 transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
         <label htmlFor="oe-tipo_moneda" className="block text-xs font-medium text-slate-400 uppercase tracking-wider">
           Tipo de Moneda <span className="text-red-400">*</span>
         </label>
@@ -139,9 +165,9 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
       </div>
 
       {/* Monto USD */}
-      <div id="oe-usd-group" className="space-y-1.5">
+      <div id="oe-usd-group" className={`space-y-1.5 transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
         <label htmlFor="oe-monto_usd" className="block text-xs font-medium text-slate-400 uppercase tracking-wider">
-          Monto en Dólares (USD) <span className="text-red-400">*</span>
+          Monto en Dólares (USD) {!financiado && <span className="text-red-400">*</span>}
         </label>
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -153,7 +179,7 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
             type="number"
             step="0.01"
             min="0"
-            placeholder="0.00"
+            placeholder={financiado ? "Financiado" : "0.00"}
             defaultValue=""
             className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-600 focus:border-rose-500/50 focus:outline-none focus:ring-1 focus:ring-rose-500/30 transition-all"
           />
@@ -161,9 +187,9 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
       </div>
 
       {/* Monto BS */}
-      <div id="oe-bs-group" className="space-y-1.5 hidden">
+      <div id="oe-bs-group" className={`space-y-1.5 hidden transition-opacity ${financiado ? "opacity-50 pointer-events-none" : ""}`}>
         <label htmlFor="oe-monto_bs" className="block text-xs font-medium text-slate-400 uppercase tracking-wider">
-          Monto en Bolívares (Bs) <span className="text-red-400">*</span>
+          Monto en Bolívares (Bs) {!financiado && <span className="text-red-400">*</span>}
         </label>
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -175,7 +201,7 @@ export function OtrosEgresosForm({ unidad, unidades = [] }: OtrosEgresosFormProp
             type="number"
             step="0.01"
             min="0"
-            placeholder="0.00"
+            placeholder={financiado ? "Financiado" : "0.00"}
             defaultValue=""
             className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-600 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 transition-all"
           />

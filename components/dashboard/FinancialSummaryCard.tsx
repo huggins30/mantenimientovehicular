@@ -10,8 +10,8 @@ interface FinancialSummaryCardProps {
   title: string;
   amount: number;
   icon: LucideIcon;
-  /** Paleta de colores: income | expense | maintenance | labor | profit | debt */
-  variant: "income" | "expense" | "maintenance" | "labor" | "profit" | "debt";
+  /** Paleta de colores: income | expense | maintenance | labor | profit | debt | credit */
+  variant: "income" | "expense" | "maintenance" | "labor" | "profit" | "debt" | "credit";
   subtitle?: string;
   currency?: "USD" | "BS" | "PEN";
   badgeText?: string;
@@ -77,6 +77,15 @@ const variantConfig = {
     amountColor: "text-rose-300",
     badge: "bg-rose-500/20 text-rose-300",
     badgeText: "Por Pagar",
+  },
+  credit: {
+    gradient: "from-blue-500/20 to-indigo-600/10",
+    border: "border-blue-500/30",
+    iconBg: "bg-blue-500/20",
+    iconColor: "text-blue-400",
+    amountColor: "text-blue-400",
+    badge: "bg-blue-500/20 text-blue-300",
+    badgeText: "Financiado",
   },
 };
 

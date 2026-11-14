@@ -18,6 +18,7 @@ import {
   UserCheck,
   ClipboardList,
   Wallet,
+  CreditCard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -80,6 +81,12 @@ export function Sidebar({ activeUnidadId, isAdmin = false }: SidebarProps) {
       label: "Reporte de Mantenimiento",
       icon: ClipboardList,
       description: "Piezas y cambios de aceite",
+    },
+    {
+      id: "financiamiento",
+      label: "Financiamiento",
+      icon: CreditCard,
+      description: "Piezas y egresos a crédito",
     },
   ];
 

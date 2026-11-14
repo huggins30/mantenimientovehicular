@@ -128,6 +128,8 @@ export interface RegistroMantenimiento {
   abono?: number;
   /** Lista detallada de repuestos/piezas individuales con cantidades y montos */
   piezas_detalle?: RegistroMantenimientoItem[] | string;
+  /** Si es true, los montos están financiados (se ocultan temporalmente) */
+  financiado?: boolean;
 }
 
 // -------------------------------------------------------
@@ -221,6 +223,8 @@ export interface OtroEgreso {
   monto_bs: number;
   fecha: string; // ISO date string
   notas?: string | null;
+  /** Si es true, el monto se oculta temporalmente (financiado) */
+  financiado?: boolean;
   created_at?: string;
 }
 
@@ -304,6 +308,12 @@ export interface FinancialSummary {
   totalOtrosEgresosDolares?: number;
   /** Total de otros egresos en bolívares (se resta de la rentabilidad en Bs) */
   totalOtrosEgresosBolivares?: number;
+  /** Total de pagos realizados sobre financiamientos en dólares */
+  totalPagosFinanciamientoUSD?: number;
+  /** Total de pagos realizados sobre financiamientos en bolívares */
+  totalPagosFinanciamientoBs?: number;
+  /** Cantidad de registros actualmente financiados */
+  totalRegistrosFinanciados?: number;
 }
 
 /** Datos completos que carga el dashboard */
@@ -318,6 +328,7 @@ export interface DashboardData {
   ultimosRegistrosMantenimiento: RegistroMantenimiento[];
   otrosIngresos?: OtroIngreso[];
   otrosEgresos?: OtroEgreso[];
+  pagosFinanciamiento?: PagoFinanciamiento[];
 }
 
 /** Resultado genérico de un Server Action */
@@ -325,6 +336,23 @@ export interface ActionResult<T = null> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// -------------------------------------------------------
+// Tabla: pagos_financiamiento
+// Pagos realizados sobre egresos u/o mantenimientos financiados
+// -------------------------------------------------------
+export interface PagoFinanciamiento {
+  id: number;
+  user_id: string;
+  otro_egreso_id?: number | null;
+  registro_mantenimiento_id?: number | null;
+  tipo_moneda: "USD" | "BS";
+  monto_usd: number;
+  monto_bs: number;
+  fecha: string;
+  notas?: string | null;
+  created_at?: string;
 }
 
 // -------------------------------------------------------

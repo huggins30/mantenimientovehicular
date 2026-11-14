@@ -26,6 +26,7 @@ import {
   Receipt,
   CheckCircle2,
   Layers,
+  CreditCard,
 } from "lucide-react";
 
 interface MantenimientoTableProps {
@@ -269,6 +270,13 @@ function DetalleModal({
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {registro.financiado && (
+          <div className="mx-6 mt-3 flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3.5 py-2.5 text-xs font-semibold text-blue-300">
+            <CreditCard className="h-4 w-4 shrink-0 text-blue-400" />
+            <span>Mantenimiento <strong>Financiado</strong>: Los montos quedan pendientes y se gestionan en el módulo de Financiamiento.</span>
+          </div>
+        )}
 
         {/* Contenido */}
         <div className="px-6 py-5 space-y-4 max-h-[calc(85vh-120px)] overflow-y-auto">
@@ -789,22 +797,38 @@ export function MantenimientoTable({
                 </div>
 
                 {/* Total */}
-                <div className="text-right shrink-0">
-                  <span className="font-mono font-bold text-violet-300 text-sm block">
-                    {formatUSD(r.costo_total)}
-                  </span>
-                  {totalBs > 0 && (
-                    <span className="font-mono text-[11px] text-cyan-400 block">
-                      {formatBs(totalBs)}
+                <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                  {r.financiado && (Number(r.costo_total) || 0) === 0 && ((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0)) === 0 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-300 shadow-sm" title="Financiamiento activo (Sin abonos aún)">
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Financiado
                     </span>
+                  ) : (
+                    <>
+                      <span className="font-mono font-bold text-violet-300 text-sm block">
+                        {formatUSD(r.costo_total)}
+                      </span>
+                      {totalBs > 0 && (
+                        <span className="font-mono text-[11px] text-cyan-400 block">
+                          {formatBs(totalBs)}
+                        </span>
+                      )}
+                      {((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0)) > 0 && (
+                        <span className="font-mono text-[10px] text-purple-300 block font-semibold" title="Bolívares directos">
+                          +{formatBs((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0))} Bs
+                        </span>
+                      )}
+                      {/* Badge de Financiado (se mantiene visible mientras esté financiado) */}
+                      {r.financiado && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 text-[10px] font-bold text-blue-300" title="Financiamiento activo">
+                          <CreditCard className="h-2.5 w-2.5" />
+                          Financiado
+                        </span>
+                      )}
+                    </>
                   )}
-                  {((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0)) > 0 && (
-                    <span className="font-mono text-[10px] text-purple-300 block font-semibold" title="Bolívares directos">
-                      +{formatBs((Number(r.precio_bs_repuestos) || 0) + (Number(r.precio_bs_mano_obra) || 0))} Bs
-                    </span>
-                  )}
-                  {/* Indicador de abono y saldo */}
-                  {(Number(r.abono) || 0) > 0 && (() => {
+                  {/* Indicador de abono y saldo cuando no es financiado */}
+                  {!r.financiado && (Number(r.abono) || 0) > 0 && (() => {
                     const rAbono = Number(r.abono) || 0;
                     const rSaldo = r.costo_total - rAbono;
                     return (
